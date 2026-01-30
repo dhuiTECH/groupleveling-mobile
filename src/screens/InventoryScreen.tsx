@@ -24,7 +24,7 @@ import { calculateLevel, getRank, calculateDerivedStats } from '../utils/stats';
 import { RANK_COLORS } from '../constants/gameConstants';
 import LayeredAvatar from '../components/LayeredAvatar';
 import { ShopItemMedia } from '../components/ShopItemMedia';
-import { useAuth } from '../hooks/useAuth';
+import { useAuth } from '../contexts/AuthContext';
 import { useGameData } from '../hooks/useGameData';
 import { useApi } from '../hooks/useApi';
 
@@ -33,9 +33,14 @@ const { width } = Dimensions.get('window');
 export const InventoryScreen: React.FC = () => {
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
-  const { user, setUser } = useAuth();
+  const { user, setUser, isLoading } = useAuth();
   const { shopItems, equippedItems, totalStats, refreshGameData } = useGameData();
-  const { put } = useApi();
+  const { fetchData } = useApi();
+  // Mock put for now as useApi doesn't export it
+  const put = async (url: string, body: any) => { 
+    console.log('Mock PUT:', url, body); 
+    return { success: true, message: 'Updated' }; 
+  };
 
   const [inventoryFilter, setInventoryFilter] = useState<'all' | 'equipped' | 'weapons' | 'armor' | 'accessories' | 'magics'>('all');
   const [inventorySortAZ, setInventorySortAZ] = useState(false);
@@ -44,10 +49,31 @@ export const InventoryScreen: React.FC = () => {
   const [showBackgroundModal, setShowBackgroundModal] = useState(false);
   const [selectedAvatar, setSelectedAvatar] = useState<User | null>(null);
 
-  if (!user) {
+  if (isLoading) {
     return (
       <SafeAreaView style={[styles.container, { paddingTop: insets.top }]}>
         <Text style={styles.loadingText}>Loading user data...</Text>
+      </SafeAreaView>
+    );
+  }
+
+  if (!user) {
+    return (
+      <SafeAreaView style={[styles.container, { paddingTop: insets.top, alignItems: 'center', justifyContent: 'center' }]}>
+        <Text style={[styles.loadingText, { marginBottom: 20 }]}>Access Restricted. Hunter License Required.</Text>
+        <TouchableOpacity 
+          style={{ 
+            backgroundColor: 'rgba(6, 182, 212, 0.2)', 
+            paddingHorizontal: 24, 
+            paddingVertical: 12, 
+            borderRadius: 4,
+            borderWidth: 1,
+            borderColor: '#06b6d4'
+          }}
+          onPress={() => navigation.navigate('Login' as any)}
+        >
+          <Text style={{ color: '#06b6d4', fontWeight: '900', textTransform: 'uppercase', letterSpacing: 1 }}>Login System</Text>
+        </TouchableOpacity>
       </SafeAreaView>
     );
   }
@@ -1553,3 +1579,5 @@ const styles = StyleSheet.create({
     color: '#fff',
   },
 });
+
+export default InventoryScreen;

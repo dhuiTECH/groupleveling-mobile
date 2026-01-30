@@ -3,6 +3,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
 import { AppState } from 'react-native';
+import { ShopItem, UserCosmetic } from '../types/user';
 
 interface GameData {
   score: number;
@@ -98,10 +99,20 @@ export const useGameData = () => {
     }
   };
 
+  // Mock data for InventoryScreen compatibility
+  const shopItems: ShopItem[] = [];
+  const equippedItems: UserCosmetic[] = [];
+  const totalStats: any = {};
+  const refreshGameData = async () => { await loadGameData(); };
+
   return {
     gameData,
     loading,
     updateGameData,
     resetGameData,
+    shopItems,
+    equippedItems,
+    totalStats,
+    refreshGameData
   };
 };

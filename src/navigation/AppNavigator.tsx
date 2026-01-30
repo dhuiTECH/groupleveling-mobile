@@ -1,7 +1,9 @@
 import React from 'react';
+import { View, ActivityIndicator } from 'react-native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import type { RootStackParamList, RootTabParamList } from '../types/navigation';
+import { useAuth } from '../contexts/AuthContext';
 
 import HomeScreen from '../screens/HomeScreen';
 import LoginScreen from '../screens/LoginScreen';
@@ -40,47 +42,61 @@ function BottomTabNavigator() {
 }
 
 export function AppNavigator(): JSX.Element {
+  const { user, isLoading } = useAuth();
+
+  if (isLoading) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#0f172a' }}>
+        <ActivityIndicator size="large" color="#00ffff" />
+      </View>
+    );
+  }
+
   return (
     <Stack.Navigator 
-      initialRouteName="Home"
       screenOptions={{
         headerShown: false, // Hide header for all stack screens by default
       }}
     >
-      <Stack.Screen 
-        name="Home" 
-        component={BottomTabNavigator}
-      />
-      <Stack.Screen 
-        name="Login" 
-        component={LoginScreen}
-      />
-      <Stack.Screen 
-        name="Signup" 
-        component={SignupScreen}
-      />
-      <Stack.Screen 
-        name="Admin" 
-        component={AdminScreen}
-      />
-      <Stack.Screen 
-        name="ClassSelection" 
-        component={ClassSelectionScreen}
-      />
-      {/* 
-        Screens accessible from within the app but not part of the main tabs.
-        Usually detail views or modals.
-      */}
-       <Stack.Screen 
-        name="Dungeon" 
-        component={DungeonScreen}
-        options={{ title: 'Dungeon' }}
-      />
-      <Stack.Screen 
-        name="Dashboard" 
-        component={DashboardScreen}
-        options={{ title: 'Dashboard' }}
-      />
+      {user ? (
+        // Authenticated Stack
+        <>
+          <Stack.Screen 
+            name="Home" 
+            component={BottomTabNavigator} 
+          />
+          <Stack.Screen 
+            name="ClassSelection" 
+            component={ClassSelectionScreen}
+          />
+          <Stack.Screen 
+            name="Dungeon" 
+            component={DungeonScreen}
+            options={{ title: 'Dungeon' }}
+          />
+          <Stack.Screen 
+            name="Dashboard" 
+            component={DashboardScreen}
+            options={{ title: 'Dashboard' }}
+          />
+          <Stack.Screen 
+            name="Admin" 
+            component={AdminScreen}
+          />
+        </>
+      ) : (
+        // Auth Stack
+        <>
+          <Stack.Screen 
+            name="Signup" 
+            component={SignupScreen}
+          />
+          <Stack.Screen 
+            name="Login" 
+            component={LoginScreen}
+          />
+        </>
+      )}
     </Stack.Navigator>
   );
 }

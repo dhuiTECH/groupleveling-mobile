@@ -1,20 +1,16 @@
 import React, { useEffect, createContext, useContext, useState, ReactNode } from 'react';
 import { supabase } from '../lib/supabase';
 import { User as SupabaseUser } from '@supabase/supabase-js';
-
-export interface User {
-  id: string;
-  email: string;
-  name: string;
-}
+import { User } from '../types/user';
 
 interface AuthContextType {
   user: User | null;
   supabaseUser: SupabaseUser | null;
   isLoading: boolean;
-  login: (email: string, password: string) => Promise<void>;
+  signInWithOtp: (email: string) => Promise<void>;
+  verifyOtp: (email: string, token: string) => Promise<void>;
   logout: () => Promise<void>;
-  register: (email: string, password: string, name: string) => Promise<void>;
+  setUser: (user: User | null) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -34,11 +30,36 @@ export function AuthProvider({ children }: AuthProviderProps): JSX.Element {
       const { data: { session }, error } = await supabase.auth.getSession();
       if (session) {
         setSupabaseUser(session.user);
+        
+        // Fetch full profile from DB
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', session.user.id)
+          .single();
+
         setUser({
           id: session.user.id,
           email: session.user.email || '',
-          name: session.user.user_metadata?.display_name || 'User',
-        });
+          name: profile?.hunter_name || session.user.user_metadata?.display_name || 'User',
+          level: profile?.level || 1,
+          exp: profile?.exp || 0,
+          coins: profile?.coins || 0,
+          gems: profile?.gems || 0,
+          current_class: profile?.current_class,
+          gender: profile?.gender,
+          onboarding_completed: profile?.onboarding_completed,
+          cosmetics: [], // Need to fetch cosmetics separately or via join
+          submittedIds: [],
+          slotsUsed: 0,
+          createdAt: new Date(profile?.created_at || new Date()),
+          updatedAt: new Date(profile?.updated_at || new Date()),
+          current_hp: profile?.current_hp,
+          max_hp: profile?.max_hp,
+          current_mp: profile?.current_mp,
+          max_mp: profile?.max_mp,
+          profilePicture: profile?.avatar ? { uri: profile.avatar } : require('../../assets/sungjinwoo.png'), // Handle avatar URL or local asset
+        } as User);
       }
       setIsLoading(false);
     };
@@ -47,14 +68,37 @@ export function AuthProvider({ children }: AuthProviderProps): JSX.Element {
 
     // Listen for changes on auth state (logged in, signed out, etc.)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
+      async (_event, session) => {
         setSupabaseUser(session?.user ?? null);
         if (session) {
-          setUser({
-            id: session.user.id,
-            email: session.user.email || '',
-            name: session.user.user_metadata?.display_name || 'User',
-          });
+             const { data: profile } = await supabase
+                .from('profiles')
+                .select('*')
+                .eq('id', session.user.id)
+                .single();
+
+             setUser({
+              id: session.user.id,
+              email: session.user.email || '',
+              name: profile?.hunter_name || session.user.user_metadata?.display_name || 'User',
+              level: profile?.level || 1,
+              exp: profile?.exp || 0,
+              coins: profile?.coins || 0,
+              gems: profile?.gems || 0,
+              current_class: profile?.current_class,
+              gender: profile?.gender,
+              onboarding_completed: profile?.onboarding_completed,
+              cosmetics: [],
+              submittedIds: [],
+              slotsUsed: 0,
+              createdAt: new Date(profile?.created_at || new Date()),
+              updatedAt: new Date(profile?.updated_at || new Date()),
+              current_hp: profile?.current_hp,
+              max_hp: profile?.max_hp,
+              current_mp: profile?.current_mp,
+              max_mp: profile?.max_mp,
+              profilePicture: profile?.avatar ? { uri: profile.avatar } : require('../../assets/sungjinwoo.png'),
+            } as User);
         } else {
           setUser(null);
         }
@@ -66,21 +110,6 @@ export function AuthProvider({ children }: AuthProviderProps): JSX.Element {
       subscription.unsubscribe();
     };
   }, []);
-
-  const login = async (email: string, password: string): Promise<void> => {
-    setIsLoading(true);
-    try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-      if (error) throw error;
-    } catch (error) {
-      throw error;
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   const logout = async (): Promise<void> => {
     setIsLoading(true);
@@ -96,17 +125,25 @@ export function AuthProvider({ children }: AuthProviderProps): JSX.Element {
     }
   };
 
-  const register = async (email: string, password: string, name: string): Promise<void> => {
+  const signInWithOtp = async (email: string): Promise<void> => {
     setIsLoading(true);
     try {
-      const { error } = await supabase.auth.signUp({
+      const { error } = await supabase.auth.signInWithOtp({ email });
+      if (error) throw error;
+    } catch (error) {
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const verifyOtp = async (email: string, token: string): Promise<void> => {
+    setIsLoading(true);
+    try {
+      const { error } = await supabase.auth.verifyOtp({
         email,
-        password,
-        options: {
-          data: {
-            display_name: name,
-          },
-        },
+        token,
+        type: 'email',
       });
       if (error) throw error;
     } catch (error) {
@@ -117,7 +154,7 @@ export function AuthProvider({ children }: AuthProviderProps): JSX.Element {
   };
 
   return (
-    <AuthContext.Provider value={{ user, supabaseUser, isLoading, login, logout, register }}>
+    <AuthContext.Provider value={{ user, supabaseUser, isLoading, signInWithOtp, verifyOtp, logout, setUser }}>
       {children}
     </AuthContext.Provider>
   );

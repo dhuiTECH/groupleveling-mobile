@@ -62,7 +62,11 @@ export interface User {
   avatar_url?: string;
   coins?: number;
   gems?: number;
-  is_private?: boolean; // Added based on HomeScreen mock user data
+  is_private?: boolean; 
+  current_class?: string;
+  onboarding_completed?: boolean;
+  gender?: string;
+  hunter_rank?: string;
 }
 
 export interface AuthContextType {

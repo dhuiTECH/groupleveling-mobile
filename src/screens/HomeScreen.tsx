@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { 
   View, 
   Text, 
@@ -9,12 +9,14 @@ import {
   RefreshControl, 
   TouchableOpacity,
   Dimensions,
-  Platform
+  Platform,
+  ActivityIndicator
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
+import { useAuth } from '../contexts/AuthContext';
 
 // Components
 import VitalitySection from '../components/VitalitySection';
@@ -25,25 +27,19 @@ import DungeonView from '../components/DungeonView';
 const HomeScreen: React.FC = () => {
   const navigation = useNavigation<any>();
   const insets = useSafeAreaInsets();
+  const { user } = useAuth();
   const [refreshing, setRefreshing] = useState(false);
 
-  // Mock User Data based on Next.js component requirements
-  const [user, setUser] = useState({
-    name: 'Ben Dover',
-    level: 8,
-    exp: 5063,
-    current_hp: 100,
-    max_hp: 100,
-    current_mp: 50,
-    max_mp: 50,
-    manual_daily_completions: 1,
-    manual_weekly_streak: 0,
-    submittedIds: [],
-    slotsUsed: 0,
-    gems: 23,
-    coins: 10527,
-    profilePicture: require('../../assets/sungjinwoo.png')
-  });
+  // Enforce Class Selection if logged in but no class
+  useEffect(() => {
+    if (user && !user.current_class) {
+      // Small delay to ensure navigation is ready
+      const timer = setTimeout(() => {
+        navigation.navigate('ClassSelection');
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [user]);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
@@ -52,6 +48,23 @@ const HomeScreen: React.FC = () => {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     }, 1500);
   }, []);
+
+  if (!user) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color="#00ffff" />
+      </View>
+    );
+  }
+
+  // Use user data from context or fallbacks
+  const displayUser = {
+    ...user,
+    profilePicture: user.profilePicture || require('../../assets/sungjinwoo.png'), // Fallback if not set
+    coins: user.coins || 0,
+    gems: user.gems || 0,
+    level: user.level || 1,
+  };
 
   return (
     <View style={styles.container}>
