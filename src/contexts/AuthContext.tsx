@@ -11,6 +11,7 @@ interface AuthContextType {
   verifyOtp: (email: string, token: string) => Promise<void>;
   logout: () => Promise<void>;
   setUser: (user: User | null) => void;
+  checkProfileExists: (identifier: string) => Promise<any>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -126,19 +127,15 @@ export function AuthProvider({ children }: AuthProviderProps): JSX.Element {
   };
 
   const signInWithOtp = async (email: string): Promise<void> => {
-    setIsLoading(true);
     try {
       const { error } = await supabase.auth.signInWithOtp({ email });
       if (error) throw error;
     } catch (error) {
       throw error;
-    } finally {
-      setIsLoading(false);
     }
   };
 
   const verifyOtp = async (email: string, token: string): Promise<void> => {
-    setIsLoading(true);
     try {
       const { error } = await supabase.auth.verifyOtp({
         email,
@@ -148,13 +145,30 @@ export function AuthProvider({ children }: AuthProviderProps): JSX.Element {
       if (error) throw error;
     } catch (error) {
       throw error;
-    } finally {
-      setIsLoading(false);
     }
   };
 
+  const checkProfileExists = async (identifier: string): Promise<any> => {
+    // Check by email or hunter_name
+    const { data: profileByEmail } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('email', identifier)
+      .single();
+
+    if (profileByEmail) return profileByEmail;
+
+    const { data: profileByName } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('hunter_name', identifier)
+      .single();
+
+    return profileByName;
+  };
+
   return (
-    <AuthContext.Provider value={{ user, supabaseUser, isLoading, signInWithOtp, verifyOtp, logout, setUser }}>
+    <AuthContext.Provider value={{ user, supabaseUser, isLoading, signInWithOtp, verifyOtp, logout, setUser, checkProfileExists }}>
       {children}
     </AuthContext.Provider>
   );

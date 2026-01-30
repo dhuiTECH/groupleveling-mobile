@@ -17,18 +17,21 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { useAuth } from '../contexts/AuthContext';
+import { Settings } from 'lucide-react-native';
 
 // Components
 import VitalitySection from '../components/VitalitySection';
 import TrainingWidget from '../components/TrainingWidget';
 import DungeonView from '../components/DungeonView';
+import { SettingsModal } from '../components/SettingsModal';
 // GameBottomNav is now handled by AppNavigator
 
 const HomeScreen: React.FC = () => {
   const navigation = useNavigation<any>();
   const insets = useSafeAreaInsets();
-  const { user } = useAuth();
+  const { user, setUser, logout } = useAuth();
   const [refreshing, setRefreshing] = useState(false);
+  const [settingsVisible, setSettingsVisible] = useState(false);
 
   // Enforce Class Selection if logged in but no class
   useEffect(() => {
@@ -98,11 +101,18 @@ const HomeScreen: React.FC = () => {
                 <Text style={styles.currencyValue}>{user.coins.toLocaleString()}</Text>
               </View>
             </View>
-            <TouchableOpacity style={styles.settingsBtn}>
-              <Image source={require('../../assets/gear.png')} style={styles.settingsIcon} />
+            <TouchableOpacity style={styles.settingsBtn} onPress={() => setSettingsVisible(true)}>
+              <Settings size={20} color="#64748b" />
             </TouchableOpacity>
           </View>
         </View>
+
+        <SettingsModal
+          visible={settingsVisible}
+          onClose={() => setSettingsVisible(false)}
+          onLogout={logout}
+          onChat={() => navigation.navigate('Social')}
+        />
 
         <ScrollView
           contentContainerStyle={styles.scrollContent}

@@ -1,79 +1,40 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, SafeAreaView, Image, Alert, KeyboardAvoidingView, Platform, Switch } from 'react-native';
+import React, { useState } from 'react';
+import { 
+  View, 
+  Text, 
+  StyleSheet, 
+  SafeAreaView, 
+  Alert, 
+  KeyboardAvoidingView, 
+  Platform, 
+  TouchableOpacity
+} from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { RootStackScreenProps } from '../types/navigation';
-import * as LocalAuthentication from 'expo-local-authentication';
 import * as Haptics from 'expo-haptics';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '../contexts/AuthContext';
 import { Video, ResizeMode } from 'expo-av';
 
 // Import UI components
-import Button from '../components/ui/Button';
+import { TechButton } from '../components/ui/TechButton';
 import Input from '../components/ui/Input';
-import Card from '../components/ui/Card';
+import { GlowText } from '../components/ui/GlowText';
+import { SystemGlass } from '../components/ui/SystemGlass';
 
-// Import assets
-import logo from '../../assets/icon.png';
-
-interface LoginScreenProps {}
-
-export const LoginScreen: React.FC<LoginScreenProps> = () => {
+export const LoginScreen: React.FC = () => {
   const navigation = useNavigation<RootStackScreenProps<'Login'>['navigation']>();
-  const { signInWithOtp, verifyOtp } = useAuth();
+  const { signInWithOtp, verifyOtp, checkProfileExists } = useAuth();
 
-  const [email, setEmail] = useState('');
+  const [identifier, setIdentifier] = useState(''); // Email or Hunter Name
+  const [email, setEmail] = useState(''); // The actual email to send OTP to
   const [otp, setOtp] = useState('');
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [step, setStep] = useState(1); // 1: Enter email, 2: Verify OTP
+  const [step, setStep] = useState(1); // 1: Enter ID, 2: Verify OTP
+  const [hunterName, setHunterName] = useState('');
 
-
-
-  const loadRememberMe = async () => {
-    try {
-      const value = await AsyncStorage.getItem('rememberMe');
-      if (value !== null) {
-        setRememberMe(value === 'true');
-        if (value === 'true') {
-          const storedEmail = await AsyncStorage.getItem('email');
-          const storedPassword = await AsyncStorage.getItem('password');
-          if (storedEmail && storedPassword) {
-            setEmail(storedEmail);
-            setPassword(storedPassword);
-          }
-        }
-      }
-    } catch (e) {
-      console.error('Failed to load remember me preference.', e);
-    }
-  };
-
-  const loadBiometricPreference = async () => {
-    try {
-      const value = await AsyncStorage.getItem('biometricLogin');
-      if (value !== null) {
-        setBiometricEnabled(value === 'true');
-        if (value === 'true') {
-          authenticateWithBiometrics();
-        }
-      }
-    } catch (e) {
-      console.error('Failed to load biometric preference.', e);
-    }
-  };
-
-  const saveBiometricPreference = async (value: boolean) => {
-    try {
-      await AsyncStorage.setItem('biometricLogin', value.toString());
-    } catch (e) {
-      console.error('Failed to save biometric preference.', e);
-    }
-  };
-
-  const handleLogin = async () => {
-    if (!email || !password) {
-      Alert.alert('Error', 'Please enter both email and password.');
+  const handleSendCode = async () => {
+    if (!identifier) {
+      Alert.alert('Error', 'Please enter your email or hunter name.');
       return;
     }
 
@@ -81,64 +42,47 @@ export const LoginScreen: React.FC<LoginScreenProps> = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
     try {
-      await login(email, password);
-      // Explicitly navigate to Home
-      navigation.reset({
-        index: 0,
-        routes: [{ name: 'Home' }],
-      });
+      const profile = await checkProfileExists(identifier);
       
-      if (rememberMe) {
-        AsyncStorage.setItem('rememberMe', 'true');
-        AsyncStorage.setItem('email', email);
-        AsyncStorage.setItem('password', password);
-      } else {
-        AsyncStorage.setItem('rememberMe', 'false');
-        AsyncStorage.removeItem('email');
-        AsyncStorage.removeItem('password');
+      if (!profile || !profile.email) {
+        Alert.alert('Hunter Not Found', 'No profile matches this ID. Please register first.');
+        setLoading(false);
+        return;
       }
+
+      setEmail(profile.email);
+      setHunterName(profile.hunter_name);
+      await signInWithOtp(profile.email);
+      setStep(2);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (error: any) {
-      Alert.alert('Login Failed', error.message || 'Invalid credentials');
+      Alert.alert('Connection Failed', error.message || 'Could not send login code.');
     } finally {
       setLoading(false);
     }
   };
 
-  const authenticateWithBiometrics = async () => {
-    const result = await LocalAuthentication.authenticateAsync({
-      promptMessage: 'Authenticate to login',
-      fallbackLabel: 'Enter Password',
-    });
-
-    if (result.success) {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      // Attempt login with stored credentials if available
-      const storedEmail = await AsyncStorage.getItem('email');
-      const storedPassword = await AsyncStorage.getItem('password');
-      
-      if (storedEmail && storedPassword) {
-        setEmail(storedEmail);
-        setPassword(storedPassword);
-        
-        setLoading(true);
-        try {
-            await login(storedEmail, storedPassword);
-        } catch(e) {
-            Alert.alert('Login Failed', 'Stored credentials invalid');
-        } finally {
-            setLoading(false);
-        }
-      } else {
-        Alert.alert('No credentials stored', 'Please login with password first to enable biometric login.');
-      }
-    } else {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+  const handleVerify = async () => {
+    if (!otp) {
+      Alert.alert('Error', 'Please enter the verification code.');
+      return;
     }
-  };
 
-  const toggleBiometricLogin = async (value: boolean) => {
-    setBiometricEnabled(value);
-    saveBiometricPreference(value);
+    setLoading(true);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+
+    try {
+      await verifyOtp(email, otp);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      navigation.reset({
+        index: 0,
+        routes: [{ name: 'Home' }],
+      });
+    } catch (error: any) {
+      Alert.alert('Verification Failed', error.message || 'Invalid or expired code.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -150,93 +94,85 @@ export const LoginScreen: React.FC<LoginScreenProps> = () => {
         shouldPlay
         isLooping
         isMuted
+        opacity={0.4}
       />
-      <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0, 0, 0, 0.7)' }]} />
-
+      
       <SafeAreaView style={styles.safeArea}>
         <KeyboardAvoidingView
           style={styles.container}
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         >
-          <ScrollView contentContainerStyle={styles.scrollContainer}>
-            <View style={styles.logoContainer}>
-              <Image source={logo} style={styles.logo} resizeMode="contain" />
-              <Text style={styles.titleText}>HUNTER LOGIN</Text>
-            </View>
+          <View className="flex-1 items-center justify-center px-6">
+            <GlowText className="text-4xl mb-2">HUNTER LOGIN</GlowText>
+            <Text 
+              style={{ color: 'rgba(255, 255, 255, 0.6)', letterSpacing: 3, fontSize: 12, marginBottom: 32 }}
+            >
+              REESTABLISH CONNECTION
+            </Text>
 
-            <Card variant="cyan" style={styles.formContainer}>
-              <Input
-                label="System ID"
-                placeholder="Enter your email"
-                keyboardType="email-address"
-                value={email}
-                onChangeText={setEmail}
-              />
-
-              <Input
-                label="Access Code"
-                placeholder="Enter your password"
-                secureTextEntry
-                value={password}
-                onChangeText={setPassword}
-              />
-
-              <View style={styles.rememberMeContainer}>
-                <Switch
-                  value={rememberMe}
-                  onValueChange={(value) => {
-                    setRememberMe(value);
-                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  }}
-                  trackColor={{ false: '#334155', true: '#00ffff' }}
-                  thumbColor={rememberMe ? '#ffffff' : '#f4f3f4'}
-                />
-                <Text style={styles.rememberMeText}>Stay Authorized</Text>
-              </View>
-
-              <Button 
-                variant="cyan" 
-                onPress={handleLogin} 
-                loading={loading}
-                style={styles.loginButton}
-              >
-                INITIALIZE LOGIN
-              </Button>
-
-              <Button 
-                variant="outline" 
-                onPress={() => navigation.navigate('ForgotPassword' as any)}
-                size="sm"
-                style={styles.forgotButton}
-              >
-                FORGOT ACCESS CODE?
-              </Button>
-
-              {biometricAvailable && (
-                <View style={styles.biometricContainer}>
-                  <Text style={styles.biometricText}>BIOMETRIC AUTH:</Text>
-                  <Switch
-                    value={biometricEnabled}
-                    onValueChange={toggleBiometricLogin}
-                    trackColor={{ false: '#334155', true: '#00ffff' }}
-                    thumbColor={biometricEnabled ? '#ffffff' : '#f4f3f4'}
-                  />
-                </View>
-              )}
-            </Card>
-
-            <View style={styles.footerContainer}>
-              <Text style={styles.footerText}>
-                NEW RECRUIT?{' '}
-                <Text
-                  style={styles.signUpLink}
-                  onPress={() => navigation.navigate('Signup' as any)}
-                >
-                  SIGN UP
+            <SystemGlass className="w-full max-w-md">
+              <View className="p-4 items-center">
+                <Text className="text-neon-cyan font-ui tracking-widest text-sm mb-4">
+                  ENTER YOUR CREDENTIALS
                 </Text>
+                {step === 2 && (
+                  <View className="text-sm text-neon-cyan font-bold mb-2">
+                    <Text className="text-neon-cyan font-ui font-bold text-center">
+                      Welcome back, Hunter {hunterName}
+                    </Text>
+                  </View>
+                )}
+
+                {step === 1 ? (
+                  <>
+                    <Input
+                      label="Email or Hunter Name"
+                      placeholder="hunter@email.com or YourHunterName"
+                      value={identifier}
+                      onChangeText={setIdentifier}
+                      keyboardType="email-address"
+                    />
+                    <TechButton 
+                      title="Send Login Code" 
+                      onPress={handleSendCode} 
+                      className="mt-4"
+                      variant="primary"
+                    />
+                  </>
+                ) : (
+                  <>
+                    <Input
+                      label="Verification Code"
+                      placeholder="Enter 6-digit code"
+                      value={otp}
+                      onChangeText={setOtp}
+                      keyboardType="numeric"
+                    />
+                    <TechButton 
+                      title="Verify & Enter" 
+                      onPress={handleVerify} 
+                      className="mt-4"
+                      variant="accent"
+                    />
+                    <TouchableOpacity onPress={() => setStep(1)} className="mt-4">
+                      <Text className="text-white/40 font-ui text-xs">BACK TO LOGIN</Text>
+                    </TouchableOpacity>
+                  </>
+                )}
+              </View>
+            </SystemGlass>
+
+            <View className="mt-12 items-center">
+              <Text className="text-white/40 font-ui text-xs tracking-widest mb-4">
+                NEW HUNTER?
               </Text>
+              <TouchableOpacity onPress={() => navigation.navigate('Signup' as any)}>
+                <Text className="text-neon-cyan font-header font-bold tracking-widest">
+                  CREATE NEW ACCOUNT →
+                </Text>
+              </TouchableOpacity>
             </View>
-          </ScrollView>
+          </View>
         </KeyboardAvoidingView>
       </SafeAreaView>
     </View>
@@ -246,87 +182,13 @@ export const LoginScreen: React.FC<LoginScreenProps> = () => {
 const styles = StyleSheet.create({
   rootContainer: {
     flex: 1,
-    backgroundColor: '#000',
+    backgroundColor: '#050505',
   },
   safeArea: {
     flex: 1,
-    backgroundColor: 'transparent',
   },
   container: {
     flex: 1,
-    backgroundColor: 'transparent',
-  },
-  scrollContainer: {
-    flexGrow: 1,
-    justifyContent: 'center',
-    padding: 20,
-  },
-  logoContainer: {
-    alignItems: 'center',
-    marginBottom: 40,
-  },
-  logo: {
-    width: 120,
-    height: 120,
-    marginBottom: 10,
-  },
-  titleText: {
-    color: '#00ffff',
-    fontSize: 24,
-    fontWeight: '900',
-    letterSpacing: 4,
-    marginTop: 10,
-  },
-  formContainer: {
-    width: '100%',
-    padding: 24,
-  },
-  rememberMeContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 24,
-  },
-  rememberMeText: {
-    marginLeft: 12,
-    fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.7)',
-    fontWeight: '600',
-    letterSpacing: 1,
-  },
-  loginButton: {
-    marginBottom: 16,
-  },
-  forgotButton: {
-    alignSelf: 'center',
-    borderWidth: 0,
-  },
-  footerContainer: {
-    marginTop: 40,
-    alignItems: 'center',
-  },
-  footerText: {
-    fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.5)',
-    letterSpacing: 1,
-  },
-  signUpLink: {
-    color: '#00ffff',
-    fontWeight: '900',
-  },
-  biometricContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: 24,
-    paddingTop: 24,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255, 255, 255, 0.1)',
-  },
-  biometricText: {
-    color: 'rgba(255, 255, 255, 0.6)',
-    fontSize: 12,
-    fontWeight: '900',
-    letterSpacing: 1,
   },
 });
 
