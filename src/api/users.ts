@@ -1,139 +1,160 @@
-// Converted React Native api file
-import React from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Platform } from 'react-native';
+import { supabase } from '../lib/supabase';
+import { User } from '../types/user';
+import { calculateLevel, getRank } from '../utils/stats';
 
-const API_BASE_URL = 'https://your-api-base-url.com'; // Replace with your actual API base URL
-
-// Helper function for making API requests
-const makeRequest = async (url: string, method: string = 'GET', body: any = null) => {
-  try {
-    const headers: { [key: string]: string } = {
-      'Content-Type': 'application/json',
-    };
-
-    const token = await AsyncStorage.getItem('authToken'); // Example: Retrieve auth token
-    if (token) {
-      headers['Authorization'] = `Bearer ${token}`;
-    }
-
-    const requestOptions: RequestInit = {
-      method,
-      headers,
-    };
-
-    if (body) {
-      requestOptions.body = JSON.stringify(body);
-    }
-
-    const response = await fetch(`${API_BASE_URL}${url}`, requestOptions);
-
-    if (!response.ok) {
-      // Handle HTTP errors
-      console.error(`API Error: ${response.status} - ${response.statusText}`);
-      throw new Error(`API request failed with status ${response.status}`);
-    }
-
-    const data = await response.json();
-    return data;
-  } catch (error: any) {
-    // Handle network errors and other exceptions
-    console.error('API Request Error:', error.message, error);
-
-    // Provide a more user-friendly error message based on the platform
-    const errorMessage = Platform.OS === 'ios'
-      ? 'A network error occurred. Please check your internet connection.'
-      : 'Network error. Ensure you have a stable internet connection.';
-
-    throw new Error(errorMessage); // Re-throw the error for the calling function to handle
-  }
-};
-
-// React Native API functions
 export const api = {
-  // Get all users
-  getUsers: async () => {
-    try {
-      const users = await makeRequest('/users', 'GET');
-      return users;
-    } catch (error: any) {
-      console.error('Error fetching users:', error.message);
-      throw error; // Re-throw to allow component-level error handling
-    }
-  },
-
   // Get a single user by ID
-  getUserById: async (id: string) => {
+  getUserById: async (id: string): Promise<User | null> => {
     try {
-      const user = await makeRequest(`/users/${id}`, 'GET');
+      // 1. Fetch Profile
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', id)
+        .single();
+
+      if (profileError || !profile) {
+        console.error('Error fetching profile:', profileError);
+        return null;
+      }
+
+      // 2. Fetch User Cosmetics
+      const { data: cosmetics, error: cosmeticsError } = await supabase
+        .from('user_cosmetics')
+        .select(`
+          id,
+          equipped,
+          created_at,
+          shop_item_id,
+          shop_items (
+            id,
+            name,
+            description,
+            image_url,
+            slot,
+            rarity,
+            is_animated,
+            animation_config,
+            bonuses,
+            scale,
+            offset_x,
+            offset_y,
+            z_index
+          )
+        `)
+        .eq('hunter_id', id);
+
+      if (cosmeticsError) {
+        console.error('Error fetching cosmetics:', cosmeticsError);
+      }
+
+      // 3. Fetch Claimed Activities Count (optional but good for consistency)
+      const { count: claimedActivities } = await supabase
+        .from('activities')
+        .select('*', { count: 'exact', head: true })
+        .eq('hunter_id', id)
+        .eq('claimed', true);
+
+      // Calculate derived values
+      const level = profile.level || calculateLevel(Number(profile.exp || 0));
+      const rank = profile.hunter_rank || getRank(level);
+
+      // Map to User interface
+      const user: User = {
+        id: profile.id,
+        name: profile.hunter_name || 'Unknown Hunter',
+        email: profile.email || '',
+        level,
+        exp: Number(profile.exp || 0),
+        current_hp: profile.current_hp,
+        max_hp: profile.max_hp,
+        current_mp: profile.current_mp,
+        max_mp: profile.max_mp,
+        coins: Number(profile.coins || 0),
+        gems: Number(profile.gems || 0),
+        hunter_rank: rank,
+        current_class: profile.current_class,
+        gender: profile.gender,
+        onboarding_completed: profile.onboarding_completed,
+        base_body_url: profile.base_body_url,
+        avatar_url: profile.avatar,
+        is_private: profile.is_private,
+        manual_daily_completions: profile.manual_daily_completions,
+        manual_weekly_streak: profile.manual_weekly_streak,
+        slotsUsed: profile.weekly_slots_used || 0,
+        submittedIds: [], // Placeholder, fetch if needed
+        createdAt: new Date(profile.created_at),
+        updatedAt: new Date(profile.updated_at || profile.created_at),
+        cosmetics: cosmetics as any || [], // Cast to avoid deep type matching issues for now
+        // stats
+        str_stat: profile.str_stat,
+        spd_stat: profile.spd_stat,
+        end_stat: profile.end_stat,
+        int_stat: profile.int_stat,
+        lck_stat: profile.lck_stat,
+        per_stat: profile.per_stat,
+        wil_stat: profile.wil_stat,
+        unassigned_stat_points: profile.unassigned_stat_points,
+      } as unknown as User; // extended casting due to some mismatched optional fields
+
       return user;
     } catch (error: any) {
-      console.error(`Error fetching user with ID ${id}:`, error.message);
-      throw error;
-    }
-  },
-
-  // Create a new user
-  createUser: async (userData: any) => {
-    try {
-      const newUser = await makeRequest('/users', 'POST', userData);
-      return newUser;
-    } catch (error: any) {
-      console.error('Error creating user:', error.message);
+      console.error(`Error in getUserById for ${id}:`, error.message);
       throw error;
     }
   },
 
   // Update an existing user
-  updateUser: async (id: string, userData: any) => {
+  updateUser: async (id: string, updates: Partial<User>) => {
     try {
-      const updatedUser = await makeRequest(`/users/${id}`, 'PUT', userData);
-      return updatedUser;
+      // Map frontend User fields back to DB profile fields if names differ
+      // For now, most match, but be careful with 'name' -> 'hunter_name'
+      const dbUpdates: any = {
+        updated_at: new Date().toISOString(),
+        ...updates
+      };
+
+      if (updates.name) {
+        dbUpdates.hunter_name = updates.name;
+        delete dbUpdates.name;
+      }
+      
+      // Remove fields that shouldn't be updated directly or don't exist on profile
+      delete dbUpdates.cosmetics;
+      delete dbUpdates.createdAt;
+      delete dbUpdates.updatedAt;
+      delete dbUpdates.submittedIds;
+      delete dbUpdates.slotsUsed;
+      delete dbUpdates.profilePicture; // If this is local only
+
+      const { data, error } = await supabase
+        .from('profiles')
+        .update(dbUpdates)
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) {
+        throw error;
+      }
+
+      return data;
     } catch (error: any) {
       console.error(`Error updating user with ID ${id}:`, error.message);
       throw error;
     }
   },
 
-  // Delete a user
+  // Create user - usually handled by Auth, but keeping if needed
+  createUser: async (userData: any) => {
+     // This usually goes through Auth/Sign up, which creates the profile via triggers
+     // But we can implement profile creation here if manual insertion is needed
+     return null; 
+  },
+
+  // Delete user
   deleteUser: async (id: string) => {
-    try {
-      await makeRequest(`/users/${id}`, 'DELETE');
-      return true; // Indicate successful deletion
-    } catch (error: any) {
-      console.error(`Error deleting user with ID ${id}:`, error.message);
-      throw error;
-    }
-  },
-
-  // Example: Authentication (Login)
-  loginUser: async (credentials: any) => {
-    try {
-      const response = await makeRequest('/auth/login', 'POST', credentials);
-
-      // Store the authentication token securely using AsyncStorage
-      if (response.token) {
-        await AsyncStorage.setItem('authToken', response.token);
-      }
-
-      return response;
-    } catch (error: any) {
-      console.error('Login failed:', error.message);
-      throw error;
-    }
-  },
-
-  // Example: Logout
-  logoutUser: async () => {
-    try {
-      // Remove the authentication token from AsyncStorage
-      await AsyncStorage.removeItem('authToken');
-      return true;
-    } catch (error: any) {
-      console.error('Logout failed:', error.message);
-      throw error;
-    }
-  },
-
-  // Add more API methods as needed
+    // Only admin usually
+    return false;
+  }
 };

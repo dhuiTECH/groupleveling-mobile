@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { api } from '../api/nutrition';
 
 interface TrainingWidgetProps {
   user: any;
@@ -18,7 +19,41 @@ const TrainingWidget: React.FC<TrainingWidgetProps> = ({
   onClaimStepsReward 
 }) => {
   const days = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
-  const currentDay = 'THU'; // Mock current day
+  const currentDay = days[new Date().getDay() === 0 ? 6 : new Date().getDay() - 1]; // Map JS getDay (Sun=0) to MON-SUN
+
+  const [nutritionTotals, setNutritionTotals] = useState({
+    protein: 0,
+    carbs: 0,
+    fats: 0,
+    calories: 0,
+  });
+
+  useEffect(() => {
+    if (user?.id) {
+      loadNutritionData();
+    }
+  }, [user]);
+
+  const loadNutritionData = async () => {
+    try {
+      const response = await api.getNutritionLogs(user.id);
+      if (response.success && response.data) {
+        const today = new Date().toISOString().split('T')[0];
+        const todaysLogs = response.data.filter((log: any) => log.created_at.startsWith(today));
+        
+        const totals = todaysLogs.reduce((acc: any, log: any) => ({
+          protein: acc.protein + (log.protein || 0),
+          carbs: acc.carbs + (log.carbs || 0),
+          fats: acc.fats + (log.fats || 0),
+          calories: acc.calories + (log.calories || 0),
+        }), { protein: 0, carbs: 0, fats: 0, calories: 0 });
+
+        setNutritionTotals(totals);
+      }
+    } catch (error) {
+      console.error('Failed to load nutrition data', error);
+    }
+  };
 
   return (
     <View style={styles.container}>
@@ -41,7 +76,7 @@ const TrainingWidget: React.FC<TrainingWidgetProps> = ({
         <View style={styles.daysContainer}>
           {days.map((day) => {
             const isActive = day === currentDay;
-            const isCompleted = day === 'WED' || day === 'THU';
+            const isCompleted = false; // TODO: Connect to training protocol status
             return (
               <View key={day} style={styles.dayItem}>
                 <Text style={[styles.dayText, isActive && styles.activeDayText]}>{day}</Text>
@@ -64,25 +99,25 @@ const TrainingWidget: React.FC<TrainingWidgetProps> = ({
           <View style={styles.statsRow}>
             <View style={styles.statItem}>
               <Text style={styles.statLabel}>P</Text>
-              <Text style={styles.statValue}>0g</Text>
+              <Text style={styles.statValue}>{nutritionTotals.protein}g</Text>
             </View>
             <View style={styles.statItem}>
               <Text style={styles.statLabel}>C</Text>
-              <Text style={styles.statValue}>0g</Text>
+              <Text style={styles.statValue}>{nutritionTotals.carbs}g</Text>
             </View>
             <View style={styles.statItem}>
               <Text style={styles.statLabel}>F</Text>
-              <Text style={styles.statValue}>0g</Text>
+              <Text style={styles.statValue}>{nutritionTotals.fats}g</Text>
             </View>
             <View style={styles.statItem}>
               <Text style={[styles.statLabel, { color: '#fbbf24' }]}>🔥</Text>
-              <Text style={styles.statValue}>0</Text>
+              <Text style={styles.statValue}>{nutritionTotals.calories}</Text>
             </View>
           </View>
 
           <TouchableOpacity style={styles.streakCard} onPress={onClaimChest}>
             <View>
-              <Text style={styles.streakLabel}>WEEKLY STREAK: 0/7</Text>
+              <Text style={styles.streakLabel}>WEEKLY STREAK: {user?.weekly_streak_count || 0}/7</Text>
             </View>
             <Image 
               source={require('../../assets/icons/mediumchest.png')} 
@@ -95,15 +130,14 @@ const TrainingWidget: React.FC<TrainingWidgetProps> = ({
         <View style={styles.progressSection}>
           <View style={styles.progressHeader}>
             <Image source={require('../../assets/icons/gachapon.png')} style={{ width: 14, height: 14, tintColor: '#22d3ee' }} />
-            {/* Using a generic icon or shoe if available, defaulting to emoji for now if asset missing */}
-            <Text style={styles.progressValue}>0 / 10,000</Text>
+            <Text style={styles.progressValue}>{user?.daily_steps || 0} / 10,000</Text>
           </View>
           <View style={styles.progressBarBg}>
-            <View style={[styles.progressBarFill, { width: '5%' }]} />
+            <View style={[styles.progressBarFill, { width: `${Math.min(((user?.daily_steps || 0) / 10000) * 100, 100)}%` }]} />
           </View>
-          <View style={styles.chestReward}>
-             <Image source={require('../../assets/icons/silverchest.png')} style={styles.miniRewardChest} />
-          </View>
+          <TouchableOpacity style={styles.chestReward} onPress={onClaimStepsReward}>
+             <Image source={require('../../assets/icons/silverchest.png')} style={[styles.miniRewardChest, (user?.daily_steps || 0) >= 10000 ? { opacity: 1 } : {}]} />
+          </TouchableOpacity>
         </View>
       </LinearGradient>
     </View>
