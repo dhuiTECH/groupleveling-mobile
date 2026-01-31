@@ -3,15 +3,17 @@ import { TouchableOpacity, Text, View, StyleSheet } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { cn } from '../../utils/cn';
 import { MotiView } from 'moti';
+import { playHunterSound } from '../../utils/audio';
 
 interface TechButtonProps {
   onPress?: () => void;
   title: string;
   className?: string;
   variant?: 'primary' | 'secondary' | 'accent';
+  disableSound?: boolean;
 }
 
-export const TechButton = ({ onPress, title, className, variant = 'primary' }: TechButtonProps) => {
+export const TechButton = ({ onPress, title, className, variant = 'primary', disableSound = false }: TechButtonProps) => {
   const getColors = () => {
     switch (variant) {
       case 'accent': return ['#A78BFA', 'rgba(167, 139, 250, 0.3)']; // Digital Lavender
@@ -20,12 +22,19 @@ export const TechButton = ({ onPress, title, className, variant = 'primary' }: T
     }
   };
 
+  const handlePress = () => {
+    if (!disableSound) {
+      playHunterSound('click');
+    }
+    onPress?.();
+  };
+
   const [mainColor, glowColor] = getColors();
 
   return (
     <TouchableOpacity 
       activeOpacity={0.8} 
-      onPress={onPress}
+      onPress={handlePress}
       className={cn("relative h-14 w-full items-center justify-center", className)}
     >
       <View style={StyleSheet.absoluteFill}>

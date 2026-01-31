@@ -18,6 +18,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { useAuth } from '../contexts/AuthContext';
 import { Settings } from 'lucide-react-native';
+import { playHunterSound } from '../utils/audio';
 
 // Components
 import VitalitySection from '../components/VitalitySection';
@@ -101,7 +102,13 @@ const HomeScreen: React.FC = () => {
                 <Text style={styles.currencyValue}>{user.coins.toLocaleString()}</Text>
               </View>
             </View>
-            <TouchableOpacity style={styles.settingsBtn} onPress={() => setSettingsVisible(true)}>
+            <TouchableOpacity 
+              style={styles.settingsBtn} 
+              onPress={() => {
+                playHunterSound('click');
+                setSettingsVisible(true);
+              }}
+            >
               <Settings size={20} color="#64748b" />
             </TouchableOpacity>
           </View>
@@ -174,7 +181,10 @@ const HomeScreen: React.FC = () => {
                  </View>
                </View>
 
-               <TouchableOpacity style={styles.uploadBtn}>
+               <TouchableOpacity 
+                 style={styles.uploadBtn}
+                 onPress={() => playHunterSound('click')}
+               >
                  <Text style={styles.uploadBtnText}>UPLOAD SCREENSHOT</Text>
                </TouchableOpacity>
              </LinearGradient>

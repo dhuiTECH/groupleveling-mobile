@@ -14,6 +14,7 @@ import type { RootStackScreenProps } from '../types/navigation';
 import * as Haptics from 'expo-haptics';
 import { useAuth } from '../contexts/AuthContext';
 import { Video, ResizeMode } from 'expo-av';
+import { playHunterSound } from '../utils/audio';
 
 // Import UI components
 import { TechButton } from '../components/ui/TechButton';
@@ -54,8 +55,10 @@ export const LoginScreen: React.FC = () => {
       setHunterName(profile.hunter_name);
       await signInWithOtp(profile.email);
       setStep(2);
+      playHunterSound('click');
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (error: any) {
+      playHunterSound('error');
       Alert.alert('Connection Failed', error.message || 'Could not send login code.');
     } finally {
       setLoading(false);
@@ -73,12 +76,14 @@ export const LoginScreen: React.FC = () => {
 
     try {
       await verifyOtp(email, otp);
+      playHunterSound('loginSuccess');
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       navigation.reset({
         index: 0,
         routes: [{ name: 'Home' }],
       });
     } catch (error: any) {
+      playHunterSound('error');
       Alert.alert('Verification Failed', error.message || 'Invalid or expired code.');
     } finally {
       setLoading(false);

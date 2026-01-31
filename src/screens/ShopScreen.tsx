@@ -1,243 +1,361 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, SafeAreaView, Image, Alert, FlatList, RefreshControl, Dimensions, Platform,  } from 'react-native';
+import { 
+  View, 
+  Text, 
+  StyleSheet, 
+  TouchableOpacity, 
+  ScrollView, 
+  SafeAreaView, 
+  Image, 
+  Alert, 
+  FlatList, 
+  RefreshControl, 
+  Dimensions, 
+  Platform,
+  ImageBackground
+} from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import type { RootStackScreenProps } from '../types/navigation';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
+import { MotiView, AnimatePresence } from 'moti';
 import * as Haptics from 'expo-haptics';
-import { useFocusEffect } from '@react-navigation/native';
+import { playHunterSound } from '../utils/audio';
+import { useAuth } from '../contexts/AuthContext';
+import { useGameData } from '../hooks/useGameData';
 
-// Import assets
-import logo from '../../assets/icon.png'; // Example logo import
-import placeholderImage from '../../assets/icon.png'; // Example placeholder image
+// Icons/Assets
+import coinIcon from '../../assets/coinicon.png';
+import gemIcon from '../../assets/gemicon.png';
+import shopIcon from '../../assets/shopicon.png';
+import placeholderImage from '../../assets/icon.png';
 
-// Define item interface
-interface ShopItem {
-  id: string;
-  name: string;
-  description: string;
-  price: number;
-  imageUrl: string;
-  isCosmetic?: boolean;
-}
+const { width } = Dimensions.get('window');
 
-const initialShopItems: ShopItem[] = [
-  {
-    id: '1',
-    name: 'Basic Sword',
-    description: 'A simple sword for beginners.',
-    price: 10,
-    imageUrl: 'https://via.placeholder.com/150', // Replace with actual image URL
-  },
-  {
-    id: '2',
-    name: 'Health Potion',
-    description: 'Restores a small amount of health.',
-    price: 5,
-    imageUrl: 'https://via.placeholder.com/150', // Replace with actual image URL
-  },
-  {
-    id: '3',
-    name: 'Cool Hat',
-    description: 'A stylish hat to customize your character.',
-    price: 20,
-    imageUrl: 'https://via.placeholder.com/150', // Replace with actual image URL
-    isCosmetic: true,
-  },
-  {
-    id: '4',
-    name: 'Strength Amulet',
-    description: 'Increases your strength stat.',
-    price: 15,
-    imageUrl: 'https://via.placeholder.com/150', // Replace with actual image URL
-  },
-  {
-    id: '5',
-    name: 'Shiny Boots',
-    description: 'Boots that make you run faster.',
-    price: 25,
-    imageUrl: 'https://via.placeholder.com/150', // Replace with actual image URL
-    isCosmetic: true,
-  },
-];
+type Category = 'all' | 'weapons' | 'armor' | 'cosmetics' | 'potions';
 
-interface ShopScreenProps {}
-
-export const ShopScreen: React.FC<ShopScreenProps> = () => {
-  const navigation = useNavigation<RootStackScreenProps<'Shop'>['navigation']>();
+export const ShopScreen: React.FC = () => {
+  const navigation = useNavigation();
   const insets = useSafeAreaInsets();
+  const { user } = useAuth();
+  const { shopItems: allItems, loading: dataLoading } = useGameData();
 
-  const [shopItems, setShopItems] = useState<ShopItem[]>(initialShopItems);
-  const [wishlist, setWishlist] = useState<string[]>([]); // Array of item IDs
-  const [isLoading, setIsLoading] = useState(false);
-  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [activeCategory, setActiveCategory] = useState<Category>('all');
+  const [refreshing, setRefreshing] = useState(false);
+  const [selectedItem, setSelectedItem] = useState<any>(null);
 
-  const numColumns = 2; // Number of columns for the grid layout
-  const screenWidth = Dimensions.get('window').width;
-  const itemWidth = (screenWidth - 40) / numColumns; // Adjust 40 for padding/margin
+  // Fallback items if allItems is empty
+  const displayItems = allItems.length > 0 ? allItems : [
+    { id: '1', name: 'BASIC_SWORD', price: 100, category: 'weapons', rarity: 'Common', image: placeholderImage },
+    { id: '2', name: 'HP_POTION_S', price: 50, category: 'potions', rarity: 'Common', image: placeholderImage },
+    { id: '3', name: 'IRON_PLATE', price: 250, category: 'armor', rarity: 'Uncommon', image: placeholderImage },
+    { id: '4', name: 'SHADOW_CLOAK', price: 500, category: 'cosmetics', rarity: 'Rare', image: placeholderImage },
+  ];
 
-  // Simulate fetching data (replace with actual API call)
-  const fetchData = async () => {
-    setIsLoading(true);
-    await new Promise((resolve) => setTimeout(resolve, 1000)); // Simulate network delay
-    // In a real app, you would fetch data from an API here
-    setIsLoading(false);
-  };
+  const filteredItems = activeCategory === 'all' 
+    ? displayItems 
+    : displayItems.filter(item => item.category === activeCategory);
 
-  useEffect(() => {
-    fetchData();
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    setTimeout(() => {
+      setRefreshing(false);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    }, 1500);
   }, []);
 
-  const onRefresh = useCallback(async () => {
-    setIsRefreshing(true);
-    await new Promise((resolve) => setTimeout(resolve, 1000)); // Simulate refresh delay
-    // In a real app, you would re-fetch data from an API here
-    setIsRefreshing(false);
-  }, []);
-
-  const toggleWishlist = (itemId: string) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    if (wishlist.includes(itemId)) {
-      setWishlist(wishlist.filter((id) => id !== itemId));
-    } else {
-      setWishlist([...wishlist, itemId]);
-    }
-  };
-
-  const handlePurchase = (item: ShopItem) => {
+  const handlePurchase = (item: any) => {
+    playHunterSound('click');
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+    
     Alert.alert(
-      'Confirm Purchase',
-      `Are you sure you want to purchase ${item.name} for $${item.price}?`,
+      'INITIATE_TRANSACTION',
+      `Confirm acquisition of ${item.name} for ${item.price} Gold?`,
       [
-        {
-          text: 'Cancel',
-          style: 'cancel',
-        },
-        {
-          text: 'Purchase',
+        { text: 'ABORT', style: 'cancel' },
+        { 
+          text: 'CONFIRM', 
           onPress: () => {
-            // Implement purchase logic here (e.g., call payment API)
-            Alert.alert('Purchase Successful', `You have purchased ${item.name}!`);
-          },
-        },
+            playHunterSound('purchasesuccess');
+            Alert.alert('System', 'Transaction complete. Item transferred to inventory.');
+          } 
+        }
       ]
     );
   };
 
-  const renderItem = ({ item }: { item: ShopItem }) => (
-    <TouchableOpacity
-      style={[styles.itemContainer, { width: itemWidth }]}
-      onPress={() => handlePurchase(item)}
-    >
-      <Image
-        source={{ uri: item.imageUrl }}
-        style={styles.itemImage}
-        defaultSource={placeholderImage} // Use placeholder image
-      />
-      <Text style={styles.itemName}>{item.name}</Text>
-      <Text style={styles.itemPrice}>${item.price}</Text>
-      <TouchableOpacity
-        style={styles.wishlistButton}
-        onPress={() => toggleWishlist(item.id)}
-      >
-        <Text>{wishlist.includes(item.id) ? '❤️' : '🤍'}</Text>
-      </TouchableOpacity>
-    </TouchableOpacity>
-  );
+  const categories: { id: Category; label: string }[] = [
+    { id: 'all', label: 'ALL_ITEMS' },
+    { id: 'weapons', label: 'WEAPONS' },
+    { id: 'armor', label: 'ARMOR' },
+    { id: 'potions', label: 'CONSUMABLES' },
+    { id: 'cosmetics', label: 'SYSTEM_SKINS' },
+  ];
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={[styles.header, { paddingTop: insets.top }]}>
-        <Image source={logo} style={styles.logo} />
-        <Text style={styles.headerTitle}>Shop</Text>
-      </View>
-
-      {isLoading ? (
-        <View style={styles.loadingContainer}>
-          <Text>Loading...</Text>
+    <View style={styles.container}>
+      <LinearGradient
+        colors={['#020617', '#0f172a', '#020617']}
+        style={StyleSheet.absoluteFill}
+      />
+      
+      <SafeAreaView style={{ flex: 1, paddingTop: Platform.OS === 'android' ? insets.top : 0 }}>
+        {/* HUD Header */}
+        <View style={styles.hudHeader}>
+          <View style={styles.hudLeft}>
+            <Text style={styles.hudLabel}>LOCATION</Text>
+            <Text style={styles.hudValue}>HUNTER_TRADING_POST</Text>
+          </View>
+          <View style={styles.hudRight}>
+            <View style={styles.currencyBox}>
+              <Image source={coinIcon} style={styles.currencyIcon} />
+              <Text style={styles.currencyValue}>{user?.coins?.toLocaleString() || '0'}</Text>
+            </View>
+          </View>
         </View>
-      ) : (
+
+        {/* Category Tabs */}
+        <View style={styles.categoryBar}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoryScroll}>
+            {categories.map(cat => (
+              <TouchableOpacity
+                key={cat.id}
+                onPress={() => {
+                  playHunterSound('click');
+                  setActiveCategory(cat.id);
+                }}
+                style={[
+                  styles.categoryTab,
+                  activeCategory === cat.id && styles.categoryTabActive
+                ]}
+              >
+                <Text style={[
+                  styles.categoryText,
+                  activeCategory === cat.id && styles.categoryTextActive
+                ]}>
+                  {cat.label}
+                </Text>
+                {activeCategory === cat.id && (
+                  <MotiView
+                    from={{ opacity: 0, scaleX: 0 }}
+                    animate={{ opacity: 1, scaleX: 1 }}
+                    transition={{ type: 'timing', duration: 200 }}
+                    style={styles.activeUnderline}
+                  />
+                )}
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+
+        {/* Items Grid */}
         <FlatList
-          data={shopItems}
-          renderItem={renderItem}
-          keyExtractor={(item) => item.id}
-          numColumns={numColumns}
-          contentContainerStyle={styles.listContainer}
+          data={filteredItems}
+          numColumns={2}
+          keyExtractor={item => item.id}
+          contentContainerStyle={styles.itemsGrid}
           refreshControl={
-            <RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} />
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#06b6d4" />
           }
+          renderItem={({ item, index }) => (
+            <MotiView
+              from={{ opacity: 0, translateY: 20 }}
+              animate={{ opacity: 1, translateY: 0 }}
+              transition={{ delay: index * 100 }}
+              style={styles.itemCardContainer}
+            >
+              <TouchableOpacity 
+                style={styles.itemCard}
+                onPress={() => handlePurchase(item)}
+                activeOpacity={0.7}
+              >
+                <View style={styles.itemImageWrapper}>
+                  <View style={styles.itemRarityGlow} />
+                  <Image source={item.image || placeholderImage} style={styles.itemImage} />
+                </View>
+                
+                <View style={styles.itemInfo}>
+                  <Text style={styles.itemName}>{item.name}</Text>
+                  <View style={styles.itemPriceRow}>
+                    <Image source={coinIcon} style={styles.smallCoinIcon} />
+                    <Text style={styles.itemPrice}>{item.price}</Text>
+                  </View>
+                </View>
+
+                {/* Decorative Elements */}
+                <View style={styles.cardCorner} />
+              </TouchableOpacity>
+            </MotiView>
+          )}
         />
-      )}
-    </SafeAreaView>
+      </SafeAreaView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#020617',
   },
-  header: {
-    backgroundColor: '#3498db',
-    paddingBottom: 10,
-    alignItems: 'center',
+  hudHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 15,
     borderBottomWidth: 1,
-    borderBottomColor: '#2980b9',
+    borderBottomColor: 'rgba(34, 211, 238, 0.2)',
   },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
+  hudLeft: {
+    alignItems: 'flex-start',
+  },
+  hudRight: {
+    alignItems: 'flex-end',
+  },
+  hudLabel: {
+    color: 'rgba(34, 211, 238, 0.6)',
+    fontSize: 8,
+    fontWeight: '900',
+    letterSpacing: 2,
+  },
+  hudValue: {
     color: '#fff',
+    fontSize: 12,
+    fontWeight: '900',
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+    textTransform: 'uppercase',
   },
-  logo: {
-    width: 50,
-    height: 50,
-    resizeMode: 'contain',
-  },
-  listContainer: {
-    padding: 10,
-  },
-  itemContainer: {
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    padding: 10,
-    margin: 5,
+  currencyBox: {
+    flexDirection: 'row',
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
+    backgroundColor: 'rgba(251, 191, 36, 0.1)',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(251, 191, 36, 0.3)',
+    gap: 6,
   },
-  itemImage: {
-    width: '100%',
-    height: 100,
-    resizeMode: 'cover',
-    borderRadius: 8,
-    marginBottom: 5,
+  currencyIcon: {
+    width: 14,
+    height: 14,
   },
-  itemName: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    textAlign: 'center',
+  currencyValue: {
+    color: '#fbbf24',
+    fontSize: 12,
+    fontWeight: '900',
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
   },
-  itemPrice: {
-    fontSize: 14,
-    color: '#27ae60',
+  categoryBar: {
+    paddingVertical: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.05)',
   },
-  wishlistButton: {
+  categoryScroll: {
+    paddingHorizontal: 15,
+    gap: 10,
+  },
+  categoryTab: {
+    paddingHorizontal: 15,
+    paddingVertical: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+  },
+  categoryTabActive: {
+    // backgroundColor: 'rgba(34, 211, 238, 0.1)',
+  },
+  categoryText: {
+    color: 'rgba(255, 255, 255, 0.4)',
+    fontSize: 10,
+    fontWeight: '900',
+    letterSpacing: 1,
+  },
+  categoryTextActive: {
+    color: '#22d3ee',
+  },
+  activeUnderline: {
     position: 'absolute',
-    top: 5,
-    right: 5,
-    padding: 5,
+    bottom: 0,
+    width: '100%',
+    height: 2,
+    backgroundColor: '#22d3ee',
+    shadowColor: '#22d3ee',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.8,
+    shadowRadius: 5,
   },
-  loadingContainer: {
-    flex: 1,
+  itemsGrid: {
+    padding: 15,
+  },
+  itemCardContainer: {
+    flex: 0.5,
+    padding: 6,
+  },
+  itemCard: {
+    backgroundColor: 'rgba(15, 23, 42, 0.9)',
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    padding: 12,
+    height: 200,
+    justifyContent: 'space-between',
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  itemImageWrapper: {
+    height: 100,
+    width: '100%',
     justifyContent: 'center',
     alignItems: 'center',
+    position: 'relative',
+  },
+  itemRarityGlow: {
+    position: 'absolute',
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: 'rgba(34, 211, 238, 0.1)',
+    zIndex: 0,
+  },
+  itemImage: {
+    width: 80,
+    height: 80,
+    resizeMode: 'contain',
+    zIndex: 1,
+  },
+  itemInfo: {
+    marginTop: 10,
+  },
+  itemName: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '900',
+    letterSpacing: 1,
+    marginBottom: 6,
+  },
+  itemPriceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  smallCoinIcon: {
+    width: 10,
+    height: 10,
+  },
+  itemPrice: {
+    color: '#fbbf24',
+    fontSize: 12,
+    fontWeight: 'bold',
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+  },
+  cardCorner: {
+    position: 'absolute',
+    top: -10,
+    right: -10,
+    width: 20,
+    height: 20,
+    backgroundColor: 'rgba(34, 211, 238, 0.2)',
+    transform: [{ rotate: '45deg' }],
   },
 });
 

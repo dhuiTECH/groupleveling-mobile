@@ -28,19 +28,17 @@ interface NavItemProps {
 // Reusable Nav Item Component
 const NavItem = ({ id, icon, label, isActive, onPress }: NavItemProps) => {
   // Shared values for animations
-  const scale = useSharedValue(isActive ? 1.5 : 1);
-  const translateY = useSharedValue(isActive ? -12 : 0);
-  const opacity = useSharedValue(isActive ? 1 : 0.4);
-  const labelScale = useSharedValue(isActive ? 1.05 : 1);
+  const scale = useSharedValue(isActive ? 1.3 : 0.9);
+  const translateY = useSharedValue(isActive ? -20 : 0); // Move up significantly when active
+  const opacity = useSharedValue(isActive ? 1 : 0.5);
   const labelOpacity = useSharedValue(isActive ? 1 : 0);
   
   // Update animations when active state changes
   useEffect(() => {
-    scale.value = withSpring(isActive ? 1.5 : 1, { damping: 12, stiffness: 100 });
-    translateY.value = withSpring(isActive ? -12 : 0, { damping: 12, stiffness: 100 });
-    opacity.value = withTiming(isActive ? 1 : 0.4, { duration: 300 });
-    labelScale.value = withTiming(isActive ? 1.05 : 1, { duration: 300 });
-    labelOpacity.value = withTiming(isActive ? 1 : 0, { duration: 300 });
+    scale.value = withSpring(isActive ? 1.4 : 0.9, { damping: 15, stiffness: 200 });
+    translateY.value = withSpring(isActive ? -25 : 0, { damping: 15, stiffness: 200 });
+    opacity.value = withTiming(isActive ? 1 : 0.4, { duration: 200 });
+    labelOpacity.value = withTiming(isActive ? 1 : 0, { duration: 200 });
   }, [isActive]);
 
   // Animated styles
@@ -51,19 +49,19 @@ const NavItem = ({ id, icon, label, isActive, onPress }: NavItemProps) => {
         { translateY: translateY.value }
       ],
       opacity: opacity.value,
-      shadowColor: isActive ? '#3b82f6' : 'transparent',
+      // Strong blue glow for selected item
+      shadowColor: isActive ? '#00E8FF' : 'transparent',
       shadowOffset: { width: 0, height: 0 },
-      shadowOpacity: isActive ? 0.7 : 0,
-      shadowRadius: isActive ? 8 : 0,
-      elevation: isActive ? 10 : 0,
-      zIndex: isActive ? 10 : 0,
+      shadowOpacity: isActive ? 1 : 0,
+      shadowRadius: isActive ? 20 : 0,
+      elevation: isActive ? 15 : 0,
     };
   });
 
   const labelStyle = useAnimatedStyle(() => {
     return {
-      transform: [{ scale: labelScale.value }],
       opacity: labelOpacity.value,
+      transform: [{ translateY: isActive ? -5 : 0 }], 
     };
   });
 
@@ -71,14 +69,14 @@ const NavItem = ({ id, icon, label, isActive, onPress }: NavItemProps) => {
     <TouchableOpacity
       onPress={onPress}
       style={styles.navItem}
-      activeOpacity={0.8}
+      activeOpacity={1}
     >
       <Animated.View style={[styles.iconContainer, iconStyle]}>
         <Image 
           source={icon} 
           style={[
             styles.icon, 
-            !isActive && { tintColor: '#94a3b8' } // Grayscale effect
+            !isActive && { tintColor: 'rgba(255, 255, 255, 0.2)' }, // Faint white instead of solid black
           ]} 
           resizeMode="contain"
         />
@@ -93,7 +91,6 @@ const NavItem = ({ id, icon, label, isActive, onPress }: NavItemProps) => {
 
 export default function GameBottomNav({ state, descriptors, navigation }: BottomTabBarProps) {
   // Map route names to icons and labels
-  // Route names in AppNavigator: Temple, Hunter, System, Shop, Social
   const getIcon = (routeName: string) => {
     switch (routeName) {
       case 'Temple': return require('../../assets/temple.png');
@@ -106,69 +103,83 @@ export default function GameBottomNav({ state, descriptors, navigation }: Bottom
   };
 
   return (
-    <View style={styles.container}>
-        <BlurView intensity={80} tint="dark" style={StyleSheet.absoluteFill} />
+    <View style={styles.rootContainer} pointerEvents="box-none">
+      {/* Background Container (Clipped) */}
+      <View style={styles.backgroundContainer}>
+        <BlurView intensity={90} tint="dark" style={StyleSheet.absoluteFill} />
         <LinearGradient
-            colors={['rgba(15, 23, 42, 0.6)', 'rgba(2, 6, 23, 0.9)']}
+            colors={['rgba(15, 23, 42, 0.8)', 'rgba(2, 6, 23, 0.95)']}
             style={StyleSheet.absoluteFill}
         />
-        
         {/* Border Top Line */}
         <View style={styles.borderTop} />
+      </View>
 
-        <View style={styles.navContent}>
-            {state.routes.map((route, index) => {
-              const { options } = descriptors[route.key];
-              const label =
-                options.tabBarLabel !== undefined
-                  ? options.tabBarLabel
-                  : options.title !== undefined
-                  ? options.title
-                  : route.name;
+      {/* Nav Content (Unclipped for pop-out) */}
+      <View style={styles.navContent} pointerEvents="box-none">
+          {state.routes.map((route, index) => {
+            const { options } = descriptors[route.key];
+            const label =
+              options.tabBarLabel !== undefined
+                ? options.tabBarLabel
+                : options.title !== undefined
+                ? options.title
+                : route.name;
 
-              const isFocused = state.index === index;
+            const isFocused = state.index === index;
 
-              const onPress = () => {
-                const event = navigation.emit({
-                  type: 'tabPress',
-                  target: route.key,
-                  canPreventDefault: true,
-                });
+            const onPress = () => {
+              const event = navigation.emit({
+                type: 'tabPress',
+                target: route.key,
+                canPreventDefault: true,
+              });
 
-                if (!isFocused && !event.defaultPrevented) {
-                  // The `merge: true` option makes sure that the params inside the tab screen are preserved
-                  navigation.navigate({ name: route.name, merge: true } as any);
-                }
-              };
+              if (!isFocused && !event.defaultPrevented) {
+                navigation.navigate({ name: route.name, merge: true } as any);
+              }
+            };
 
-              return (
-                <NavItem
-                    key={route.key}
-                    id={route.name}
-                    icon={getIcon(route.name)}
-                    label={label as string}
-                    isActive={isFocused}
-                    onPress={onPress}
-                />
-              );
-            })}
-        </View>
+            return (
+              <NavItem
+                  key={route.key}
+                  id={route.name}
+                  icon={getIcon(route.name)}
+                  label={label as string}
+                  isActive={isFocused}
+                  onPress={onPress}
+              />
+            );
+          })}
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  rootContainer: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    height: 85, // Equivalent to h-20 plus padding
+    height: 100, // Increased height to prevent clipping when popped up
+    elevation: 0, 
+    zIndex: 100,
+  },
+  backgroundContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 80, // Solid background part
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     overflow: 'hidden',
     elevation: 20,
-    zIndex: 100,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -5 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
   },
   borderTop: {
     position: 'absolute',
@@ -181,33 +192,33 @@ const styles = StyleSheet.create({
   navContent: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    alignItems: 'center',
+    alignItems: 'flex-end', 
     height: '100%',
-    paddingBottom: 10, // Safe area padding
+    paddingBottom: 25, 
   },
   navItem: {
     flex: 1,
     alignItems: 'center',
-    justifyContent: 'center',
-    height: '100%',
+    justifyContent: 'flex-end',
+    height: 120, // Tall enough for animation
   },
   iconContainer: {
-    width: 40,
-    height: 40,
+    width: 60,
+    height: 60,
     justifyContent: 'center',
     alignItems: 'center',
   },
   icon: {
-    width: 28,
-    height: 28,
+    width: 35,
+    height: 35,
   },
   label: {
-    position: 'absolute',
-    bottom: 12,
     fontSize: 10,
     fontWeight: '900',
-    color: '#60a5fa', // blue-400
+    color: '#00E8FF', // neon cyan
     textTransform: 'uppercase',
-    letterSpacing: -0.5,
+    letterSpacing: 1,
+    position: 'absolute',
+    bottom: 5,
   },
 });

@@ -1,256 +1,466 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, SafeAreaView, Image, Alert, Dimensions, ActivityIndicator, Vibration, Platform } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import { 
+  View, 
+  Text, 
+  StyleSheet, 
+  TouchableOpacity, 
+  ScrollView, 
+  SafeAreaView, 
+  Image, 
+  Alert, 
+  Dimensions, 
+  ActivityIndicator, 
+  Vibration, 
+  Platform,
+  ImageBackground
+} from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import type { RootStackScreenProps } from '../types/navigation';
+import { MotiView, AnimatePresence } from 'moti';
+import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
+import { playHunterSound } from '../utils/audio';
 
-// Import assets
-import swordIcon from '../../assets/huntericon.png';
-import potionIcon from '../../assets/icon.png';
+// Icons/Assets
 import goldIcon from '../../assets/coinicon.png';
-import monsterPlaceholder from '../../assets/icon.png'; // Replace with actual monster images
+import monsterPlaceholder from '../../assets/icon.png';
+import gatesBg from '../../assets/gates.png';
 
-interface DungeonScreenProps {}
+const { width, height } = Dimensions.get('window');
 
-// Mock data for demonstration
-const initialDungeonState = {
-  level: 1,
-  health: 100,
-  gold: 0,
-  monsterHealth: 50,
-  monsterName: 'Goblin',
-  monsterImage: monsterPlaceholder,
-  isFighting: false,
-  isLoading: false,
-  message: '',
-};
+interface CombatLog {
+  id: string;
+  message: string;
+  type: 'player' | 'monster' | 'system' | 'reward';
+}
 
-type DungeonState = typeof initialDungeonState;
-
-export const DungeonScreen: React.FC<DungeonScreenProps> = () => {
-  const navigation = useNavigation<RootStackScreenProps<'Dungeon'>['navigation']>();
+export const DungeonScreen: React.FC = () => {
+  const navigation = useNavigation();
   const insets = useSafeAreaInsets();
 
-  const [dungeonState, setDungeonState] = useState<DungeonState>(initialDungeonState);
+  // State
+  const [level, setLevel] = useState(1);
+  const [health, setHealth] = useState(100);
+  const [maxHealth] = useState(100);
+  const [gold, setGold] = useState(0);
+  const [monsterHealth, setMonsterHealth] = useState(50);
+  const [maxMonsterHealth, setMaxMonsterHealth] = useState(50);
+  const [monsterName, setMonsterName] = useState('Low-Rank Goblin');
+  const [isFighting, setIsFighting] = useState(false);
+  const [combatLogs, setCombatLogs] = useState<CombatLog[]>([]);
+  const [monsterShake, setMonsterShake] = useState(0);
+  const [playerShake, setPlayerShake] = useState(0);
+
+  // Initialize
+  useEffect(() => {
+    addLog('System: You have entered the D-Rank Gate.', 'system');
+    addLog(`System: Objective - Defeat ${monsterName}.`, 'system');
+  }, []);
+
+  const addLog = (message: string, type: CombatLog['type']) => {
+    const newLog: CombatLog = {
+      id: Math.random().toString(36).substr(2, 9),
+      message,
+      type,
+    };
+    setCombatLogs(prev => [newLog, ...prev].slice(0, 10));
+  };
 
   const handleAttack = () => {
-    if (dungeonState.isFighting || dungeonState.isLoading) return;
+    if (isFighting || health <= 0) return;
 
-    setDungeonState(prevState => ({
-      ...prevState,
-      isFighting: true,
-      isLoading: true,
-      message: 'Attacking...',
-    }));
-
-    // Simulate attack with a delay
+    setIsFighting(true);
+    playHunterSound('click');
+    
+    // Player Attack Phase
     setTimeout(() => {
-      const damage = Math.floor(Math.random() * 20) + 10; // Random damage between 10 and 30
-      const newMonsterHealth = dungeonState.monsterHealth - damage;
+      const damage = Math.floor(Math.random() * 15) + 10;
+      const newMonsterHealth = Math.max(0, monsterHealth - damage);
+      setMonsterHealth(newMonsterHealth);
+      setMonsterShake(10);
+      addLog(`You dealt ${damage} damage to ${monsterName}.`, 'player');
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
       if (newMonsterHealth <= 0) {
-        // Monster defeated
-        const goldReward = Math.floor(Math.random() * 50) + 25; // Random gold between 25 and 75
-        setDungeonState(prevState => ({
-          ...prevState,
-          gold: prevState.gold + goldReward,
-          message: `You defeated the ${dungeonState.monsterName} and found ${goldReward} gold!`,
-          monsterHealth: 50 + dungeonState.level * 10, // Reset monster health for next level
-          level: prevState.level + 1,
-          monsterName: `Monster Level ${prevState.level + 1}`, // Update monster name
-          isFighting: false,
-          isLoading: false,
-        }));
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        if (Platform.OS === 'android') {
-          Vibration.vibrate(500);
-        }
+        handleVictory();
       } else {
-        // Monster still alive, monster attacks back
-        const monsterDamage = Math.floor(Math.random() * 15) + 5; // Random monster damage between 5 and 20
-        const newHealth = dungeonState.health - monsterDamage;
-
-        setDungeonState(prevState => ({
-          ...prevState,
-          health: newHealth > 0 ? newHealth : 0,
-          monsterHealth: newMonsterHealth,
-          message: `You attacked for ${damage} damage! The ${dungeonState.monsterName} retaliated for ${monsterDamage} damage!`,
-          isFighting: false,
-          isLoading: false,
-        }));
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-        if (Platform.OS === 'android') {
-          Vibration.vibrate(200);
-        }
-
-        if (newHealth <= 0) {
-          // Player died
-          Alert.alert('Game Over', 'You have been defeated!', [
-            { text: 'Restart', onPress: () => resetGame() },
-          ]);
-        }
+        // Monster Retaliation Phase
+        setTimeout(() => {
+          const monsterDamage = Math.floor(Math.random() * 8) + 4;
+          const newPlayerHealth = Math.max(0, health - monsterDamage);
+          setHealth(newPlayerHealth);
+          setPlayerShake(10);
+          addLog(`${monsterName} retaliated for ${monsterDamage} damage!`, 'monster');
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+          
+          if (newPlayerHealth <= 0) {
+            handleDefeat();
+          }
+          
+          setIsFighting(false);
+          setMonsterShake(0);
+          setPlayerShake(0);
+        }, 800);
       }
-    }, 1500); // Simulate attack duration
+    }, 400);
   };
 
-  const handleUsePotion = () => {
-    if (dungeonState.isFighting || dungeonState.isLoading) return;
-
-    setDungeonState(prevState => ({
-      ...prevState,
-      health: Math.min(100, prevState.health + 30), // Heal for 30, max 100
-      message: 'You used a potion and healed for 30 health!',
-    }));
-    Haptics.selectionAsync();
+  const handleVictory = () => {
+    const reward = Math.floor(Math.random() * 50) + 20;
+    setGold(prev => prev + reward);
+    addLog(`Victory! ${monsterName} defeated.`, 'reward');
+    addLog(`System: Reward acquired - ${reward} Gold.`, 'reward');
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    
+    setTimeout(() => {
+      const nextLevel = level + 1;
+      const nextMaxHealth = 50 + nextLevel * 15;
+      setLevel(nextLevel);
+      setMonsterHealth(nextMaxHealth);
+      setMaxMonsterHealth(nextMaxHealth);
+      setMonsterName(`Level ${nextLevel} Skeleton Warrior`);
+      addLog(`System: Progressing to Floor ${nextLevel}...`, 'system');
+      setIsFighting(false);
+      setMonsterShake(0);
+    }, 1500);
   };
 
-  const resetGame = () => {
-    setDungeonState(initialDungeonState);
+  const handleDefeat = () => {
+    Alert.alert('System Error', 'Player health has reached 0. Vital signs failing.', [
+      { text: 'EMERGENCY RECALL', onPress: () => navigation.goBack() }
+    ]);
+  };
+
+  const renderHealthBar = (current: number, max: number, color: string) => {
+    const percentage = (current / max) * 100;
+    return (
+      <View style={styles.healthBarBg}>
+        <MotiView
+          animate={{ width: `${percentage}%` }}
+          transition={{ type: 'timing', duration: 300 }}
+          style={[styles.healthBarFill, { backgroundColor: color }]}
+        />
+      </View>
+    );
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <StatusBar style="light" backgroundColor="#333" />
-      <View style={[styles.container, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
-        <View style={styles.header}>
-          <Text style={styles.headerText}>Dungeon Level: {dungeonState.level}</Text>
-        </View>
+    <View style={styles.container}>
+      <StatusBar style="light" />
+      <ImageBackground source={gatesBg} style={styles.bgImage} blurRadius={2}>
+        <LinearGradient
+          colors={['rgba(2, 6, 23, 0.95)', 'rgba(15, 23, 42, 0.7)', 'rgba(2, 6, 23, 0.95)']}
+          style={StyleSheet.absoluteFill}
+        />
 
-        <View style={styles.statsContainer}>
-          <View style={styles.statItem}>
-            <Image source={swordIcon} style={styles.icon} />
-            <Text style={styles.statText}>Health: {dungeonState.health}</Text>
+        <SafeAreaView style={{ flex: 1, paddingTop: Platform.OS === 'android' ? insets.top : 0 }}>
+          {/* Top HUD */}
+          <View style={styles.hudTop}>
+            <View style={styles.hudLeft}>
+              <Text style={styles.hudLabel}>FLOOR</Text>
+              <Text style={styles.hudValue}>{level}</Text>
+            </View>
+            <View style={styles.hudCenter}>
+              <View style={styles.playerInfo}>
+                <View style={styles.playerHealthLabel}>
+                  <Text style={styles.hudLabel}>HP</Text>
+                  <Text style={styles.hudValueSmall}>{health}/{maxHealth}</Text>
+                </View>
+                {renderHealthBar(health, maxHealth, '#ef4444')}
+              </View>
+            </View>
+            <View style={styles.hudRight}>
+              <Image source={goldIcon} style={styles.goldIcon} />
+              <Text style={styles.hudValue}>{gold}</Text>
+            </View>
           </View>
-          <View style={styles.statItem}>
-            <Image source={goldIcon} style={styles.icon} />
-            <Text style={styles.statText}>Gold: {dungeonState.gold}</Text>
+
+          {/* Monster Area */}
+          <View style={styles.monsterStage}>
+            <MotiView
+              animate={{
+                translateX: monsterShake,
+                opacity: monsterHealth > 0 ? 1 : 0,
+                scale: monsterHealth > 0 ? 1 : 0.8,
+              }}
+              style={styles.monsterContainer}
+            >
+              <View style={styles.monsterHeader}>
+                <Text style={styles.monsterTitle}>{monsterName.toUpperCase()}</Text>
+                {renderHealthBar(monsterHealth, maxMonsterHealth, '#22d3ee')}
+              </View>
+              
+              <Image source={monsterPlaceholder} style={styles.monsterImage} />
+              
+              <View style={styles.monsterAuraContainer}>
+                 <MotiView
+                   from={{ scale: 0.8, opacity: 0.2 }}
+                   animate={{ scale: 1.2, opacity: 0.4 }}
+                   transition={{ type: 'timing', duration: 2000, loop: true }}
+                   style={styles.monsterAura}
+                 />
+              </View>
+            </MotiView>
           </View>
-        </View>
 
-        <View style={styles.monsterContainer}>
-          <Text style={styles.monsterName}>{dungeonState.monsterName}</Text>
-          <Image source={dungeonState.monsterImage} style={styles.monsterImage} />
-          <Text style={styles.monsterHealth}>Monster Health: {dungeonState.monsterHealth}</Text>
-        </View>
-
-        <View style={styles.actionContainer}>
-          <TouchableOpacity style={styles.actionButton} onPress={handleAttack} disabled={dungeonState.isFighting || dungeonState.isLoading}>
-            <Text style={styles.actionButtonText}>
-              {dungeonState.isLoading ? 'Attacking...' : 'Attack'}
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.actionButton} onPress={handleUsePotion} disabled={dungeonState.isFighting || dungeonState.isLoading}>
-            <Text style={styles.actionButtonText}>Use Potion</Text>
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.messageContainer}>
-          <Text style={styles.messageText}>{dungeonState.message}</Text>
-        </View>
-
-        {dungeonState.isLoading && (
-          <View style={styles.loadingOverlay}>
-            <ActivityIndicator size="large" color="#fff" />
+          {/* Combat Logs */}
+          <View style={styles.logsContainer}>
+            <View style={styles.terminalHeader}>
+              <View style={styles.terminalDot} />
+              <Text style={styles.terminalTitle}>COMBAT_LOGS_PROMPT</Text>
+            </View>
+            <ScrollView 
+              style={styles.logsScroll}
+              contentContainerStyle={{ paddingVertical: 10 }}
+              showsVerticalScrollIndicator={false}
+            >
+              {combatLogs.map(log => (
+                <Text key={log.id} style={[
+                  styles.logText,
+                  log.type === 'player' && { color: '#60a5fa' },
+                  log.type === 'monster' && { color: '#ef4444' },
+                  log.type === 'system' && { color: '#22d3ee' },
+                  log.type === 'reward' && { color: '#fbbf24' },
+                ]}>
+                  {`> ${log.message}`}
+                </Text>
+              ))}
+            </ScrollView>
           </View>
-        )}
-      </View>
-    </SafeAreaView>
+
+          {/* Actions */}
+          <View style={styles.actionsContainer}>
+            <TouchableOpacity 
+              style={[styles.attackButton, isFighting && styles.buttonDisabled]} 
+              onPress={handleAttack}
+              disabled={isFighting || health <= 0}
+            >
+              <LinearGradient
+                colors={['#2563eb', '#1e40af']}
+                style={styles.buttonGradient}
+              >
+                <Text style={styles.buttonText}>{isFighting ? 'COMBAT IN PROGRESS...' : 'STRIKE'}</Text>
+              </LinearGradient>
+              <View style={styles.buttonGlitch} />
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={styles.recallButton}
+              onPress={() => navigation.goBack()}
+            >
+              <Text style={styles.recallText}>RECALL</Text>
+            </TouchableOpacity>
+          </View>
+        </SafeAreaView>
+      </ImageBackground>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: '#333',
-  },
   container: {
     flex: 1,
-    backgroundColor: '#333',
-    padding: 20,
+    backgroundColor: '#020617',
   },
-  header: {
-    marginBottom: 20,
+  bgImage: {
+    flex: 1,
   },
-  headerText: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#fff',
-    textAlign: 'center',
-  },
-  statsContainer: {
+  hudTop: {
     flexDirection: 'row',
-    justifyContent: 'spaceAround',
-    marginBottom: 20,
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(34, 211, 238, 0.2)',
   },
-  statItem: {
+  hudLeft: {
+    alignItems: 'flex-start',
+  },
+  hudCenter: {
+    flex: 1,
+    paddingHorizontal: 30,
+  },
+  hudRight: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 8,
   },
-  icon: {
-    width: 24,
-    height: 24,
-    marginRight: 5,
+  hudLabel: {
+    color: 'rgba(34, 211, 238, 0.6)',
+    fontSize: 8,
+    fontWeight: '900',
+    letterSpacing: 2,
   },
-  statText: {
-    fontSize: 16,
+  hudValue: {
     color: '#fff',
+    fontSize: 16,
+    fontWeight: '900',
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+  },
+  hudValueSmall: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: 'bold',
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+  },
+  playerInfo: {
+    width: '100%',
+  },
+  playerHealthLabel: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+  goldIcon: {
+    width: 16,
+    height: 16,
+  },
+  healthBarBg: {
+    height: 6,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 3,
+    overflow: 'hidden',
+    width: '100%',
+  },
+  healthBarFill: {
+    height: '100%',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.8,
+    shadowRadius: 5,
+    elevation: 5,
+  },
+  monsterStage: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   monsterContainer: {
     alignItems: 'center',
-    marginBottom: 20,
+    width: '100%',
+    paddingHorizontal: 40,
   },
-  monsterName: {
-    fontSize: 20,
-    fontWeight: 'bold',
+  monsterHeader: {
+    width: '100%',
+    marginBottom: 30,
+    alignItems: 'center',
+  },
+  monsterTitle: {
     color: '#fff',
-    marginBottom: 10,
+    fontSize: 20,
+    fontWeight: '900',
+    letterSpacing: 4,
+    marginBottom: 8,
+    textAlign: 'center',
+    textShadowColor: 'rgba(34, 211, 238, 0.5)',
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 10,
   },
   monsterImage: {
-    width: 150,
-    height: 150,
+    width: 220,
+    height: 220,
     resizeMode: 'contain',
-    marginBottom: 10,
+    zIndex: 10,
   },
-  monsterHealth: {
-    fontSize: 16,
-    color: '#fff',
+  monsterAuraContainer: {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    width: 300,
+    height: 300,
+    marginLeft: -150,
+    marginTop: -150,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  actionContainer: {
-    flexDirection: 'row',
-    justifyContent: 'spaceAround',
-    marginBottom: 20,
+  monsterAura: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 150,
+    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+    borderWidth: 2,
+    borderColor: 'rgba(239, 68, 68, 0.2)',
   },
-  actionButton: {
-    backgroundColor: '#4CAF50',
-    paddingVertical: 12,
-    paddingHorizontal: 24,
+  logsContainer: {
+    height: 180,
+    backgroundColor: 'rgba(2, 6, 23, 0.8)',
+    marginHorizontal: 20,
     borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    padding: 10,
   },
-  actionButtonText: {
-    fontSize: 16,
-    color: '#fff',
+  terminalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 5,
+    opacity: 0.5,
+  },
+  terminalDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#22d3ee',
+  },
+  terminalTitle: {
+    color: '#22d3ee',
+    fontSize: 8,
     fontWeight: 'bold',
-    textAlign: 'center',
+    letterSpacing: 1,
   },
-  messageContainer: {
-    marginBottom: 20,
+  logsScroll: {
+    flex: 1,
   },
-  messageText: {
-    fontSize: 16,
+  logText: {
+    fontSize: 10,
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+    marginBottom: 4,
+    letterSpacing: 0.5,
+  },
+  actionsContainer: {
+    padding: 20,
+    gap: 15,
+  },
+  attackButton: {
+    height: 60,
+    width: '100%',
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  buttonGradient: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 4,
+  },
+  buttonText: {
     color: '#fff',
-    textAlign: 'center',
+    fontSize: 14,
+    fontWeight: '900',
+    letterSpacing: 4,
   },
-  loadingOverlay: {
+  buttonDisabled: {
+    opacity: 0.6,
+  },
+  buttonGlitch: {
     position: 'absolute',
     top: 0,
     left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'center',
+    width: 4,
+    height: '100%',
+    backgroundColor: '#22d3ee',
+  },
+  recallButton: {
     alignItems: 'center',
+    paddingVertical: 10,
+  },
+  recallText: {
+    color: 'rgba(255, 255, 255, 0.4)',
+    fontSize: 10,
+    fontWeight: 'bold',
+    letterSpacing: 2,
+    textDecorationLine: 'underline',
   },
 });
 

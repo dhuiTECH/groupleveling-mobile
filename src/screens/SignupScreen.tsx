@@ -22,6 +22,7 @@ import { Video, ResizeMode } from 'expo-av';
 import { MotiView } from 'moti';
 import Svg, { Path } from 'react-native-svg';
 import { LinearGradient } from 'expo-linear-gradient';
+import { playHunterSound } from '../utils/audio';
 
 // Import UI components
 import { TechButton } from '../components/ui/TechButton';
@@ -33,12 +34,66 @@ import { cn } from '../utils/cn';
 const { width, height } = Dimensions.get('window');
 
 const CLASSES = [
-  { id: 'Assassin', name: 'Assassin', desc: 'Precision & Speed focused. Engineered for silent execution and rapid movement.', color: ['rgba(147, 51, 234, 0.4)', 'black'], image: require('../../assets/classes/assassin.webp'), icon: '🗡️' },
-  { id: 'Fighter', name: 'Fighter', desc: 'Intensity & Strength. Peak physical power. Balanced offensive and defensive capabilities.', color: ['rgba(220, 38, 38, 0.4)', 'black'], image: require('../../assets/classes/fighter.webp'), icon: '⚔️' },
-  { id: 'Tanker', name: 'Tanker', desc: 'Unyielding Defense. Engineered for endurance and survival. The ultimate shield.', color: ['rgba(37, 99, 235, 0.4)', 'black'], image: require('../../assets/classes/tanker.webp'), icon: '🛡️' },
-  { id: 'Ranger', name: 'Ranger', desc: 'Perception & Range. Long-distance specialist. Master of survival and tracking.', color: ['rgba(234, 88, 12, 0.4)', 'black'], image: require('../../assets/classes/ranger.webp'), icon: '🏹' },
-  { id: 'Mage', name: 'Mage', desc: 'Intellect & Power. Arcane energy specialist. Master of elemental control.', color: ['rgba(79, 70, 229, 0.4)', 'black'], image: require('../../assets/classes/mage.webp'), icon: '🔮' },
-  { id: 'Healer', name: 'Healer', desc: 'Spirit & Support. Vitality specialist. Master of life-preserving arts.', color: ['rgba(22, 163, 74, 0.4)', 'black'], image: require('../../assets/classes/healer.webp'), icon: '✨' }
+  { 
+    id: 'Assassin', 
+    name: 'ASSASSIN', 
+    subtitle: 'VELOCITY & PRECISION',
+    desc: 'Specializes in high-velocity output and critical strike precision. Perfect for hunters who prefer a glass-cannon playstyle.', 
+    color: ['rgba(147, 51, 234, 0.4)', 'black'], 
+    image: require('../../assets/classes/assassin.webp'), 
+    icon: require('../../assets/classes/assassinicon.webp'),
+    stats: { agility: 95, strength: 55, vitality: 40 }
+  },
+  { 
+    id: 'Fighter', 
+    name: 'FIGHTER', 
+    subtitle: 'INTENSITY & STRENGTH',
+    desc: 'Peak physical power. Engineered for maximum resistance and HIIT. Balanced offensive and defensive capabilities.', 
+    color: ['rgba(220, 38, 38, 0.4)', 'black'], 
+    image: require('../../assets/classes/fighter.webp'), 
+    icon: require('../../assets/classes/fightericon.webp'),
+    stats: { agility: 55, strength: 95, vitality: 70 }
+  },
+  { 
+    id: 'Tanker', 
+    name: 'TANKER', 
+    subtitle: 'STAMINA & ENDURANCE',
+    desc: 'Unstoppable momentum. Built for long-duration endurance and heavy resistance training. Maximum survivability.', 
+    color: ['rgba(37, 99, 235, 0.4)', 'black'], 
+    image: require('../../assets/classes/tanker.webp'), 
+    icon: require('../../assets/classes/tankericon.webp'),
+    stats: { agility: 30, strength: 75, vitality: 95 }
+  },
+  { 
+    id: 'Ranger', 
+    name: 'RANGER', 
+    subtitle: 'PERCEPTION & FOCUS',
+    desc: 'Superior environmental awareness and consistent pacing. Specialized in long-range engagement and sustained output.', 
+    color: ['rgba(234, 88, 12, 0.4)', 'black'], 
+    image: require('../../assets/classes/ranger.webp'), 
+    icon: require('../../assets/classes/rangericon.webp'),
+    stats: { agility: 85, strength: 50, vitality: 60 }
+  },
+  { 
+    id: 'Mage', 
+    name: 'MAGE', 
+    subtitle: 'TECHNICAL & CORE', 
+    desc: 'Mastery of internal balance and precision core control. High efficiency in movement patterns and energy conservation.', 
+    color: ['rgba(79, 70, 229, 0.4)', 'black'], 
+    image: require('../../assets/classes/mage.webp'), 
+    icon: require('../../assets/classes/mageicon.webp'),
+    stats: { agility: 70, strength: 40, vitality: 60 }
+  },
+  { 
+    id: 'Healer', 
+    name: 'Healer', 
+    subtitle: 'RECOVERY & CONSISTENCY',
+    desc: 'Cellular restoration focus. Consistency-based training designed to maximize recovery rate and longevity.', 
+    color: ['rgba(22, 163, 74, 0.4)', 'black'], 
+    image: require('../../assets/classes/healer.webp'), 
+    icon: require('../../assets/classes/healericon.webp'),
+    stats: { agility: 50, strength: 45, vitality: 85 }
+  }
 ];
 
 export default function SignupScreen() {
@@ -78,6 +133,7 @@ export default function SignupScreen() {
       if (existing) {
         setHunterNameError('This hunter name is already in use.');
         setLoading(false);
+        playHunterSound('error');
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
         return;
       }
@@ -86,15 +142,18 @@ export default function SignupScreen() {
       if (existingEmail) {
         setSystemError('This email is already registered.');
         setLoading(false);
+        playHunterSound('error');
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
         return;
       }
 
       await signInWithOtp(email);
+      playHunterSound('click');
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setStep('verify');
     } catch (e: any) {
       setSystemError(e.message || 'Failed to send OTP.');
+      playHunterSound('error');
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     } finally {
       setLoading(false);
@@ -108,10 +167,12 @@ export default function SignupScreen() {
     setSystemError(null);
     try {
       await verifyOtp(email, otp);
+      playHunterSound('loginSuccess');
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setStep('class_path');
     } catch (e: any) {
       setSystemError(e.message || 'OTP verification failed.');
+      playHunterSound('error');
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     } finally {
       setLoading(false);
@@ -131,6 +192,7 @@ export default function SignupScreen() {
       // Update local user context if needed (handled by AuthContext generally)
       // await updateProfile({ class: selectedClass, ... });
 
+      playHunterSound('levelUp');
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       // setUser logic or refetch profile logic would go here
       
@@ -161,23 +223,55 @@ export default function SignupScreen() {
   };
 
   const renderClassSelection = () => {
+    // Current Time for HUD
+    const [time, setTime] = useState('');
+    useEffect(() => {
+      const updateTime = () => {
+        const now = new Date();
+        setTime(now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true }));
+      };
+      updateTime();
+      const interval = setInterval(updateTime, 1000);
+      return () => clearInterval(interval);
+    }, []);
+
     return (
       <View style={styles.classContainer}>
+        {/* HUD Header */}
+        <View style={styles.hudHeader}>
+          <View>
+            <View style={styles.hudRow}>
+              <View style={styles.statusDot} />
+              <Text style={styles.hudText}>SYSTEM_STATUS: ONLINE</Text>
+            </View>
+            <Text style={[styles.hudText, { opacity: 0.4 }]}>MODE: SELECTION</Text>
+          </View>
+          <View style={{ alignItems: 'flex-end' }}>
+            <Text style={[styles.hudText, { opacity: 0.4 }]}>LOCAL_NODE: 04</Text>
+            <Text style={styles.hudTime}>{time}</Text>
+          </View>
+        </View>
+
         <View style={styles.itemsCenter}>
           {loading && <View style={styles.spinner} />} 
-          <GlowText className="text-xl mb-2" color="#06b6d4">CLASS PATH SELECTION</GlowText>
+          <GlowText className="text-4xl mb-2" color="#fff">CLASS SELECTION</GlowText>
           <Text style={styles.subText}>
-            Choose your archetype. This determines your character's core strengths and playstyle.
+            SELECT YOUR COMBAT ARCHETYPE
           </Text>
         </View>
 
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.classScroll}>
+        {/* Flex Accordion Container */}
+        <View style={styles.accordionContainer}>
           {CLASSES.map((c) => {
             const isSelected = selectedClass === c.id;
+            // Determine border color for selected state
+            const borderColor = isSelected ? '#22d3ee' : 'rgba(255,255,255,0.1)';
+            
             return (
               <TouchableOpacity
                 key={c.id}
                 onPress={() => {
+                  playHunterSound('click');
                   LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
                   setSelectedClass(c.id);
                 }}
@@ -188,6 +282,10 @@ export default function SignupScreen() {
                 ]}
               >
                 <Image source={c.image} style={StyleSheet.absoluteFill} resizeMode="cover" />
+                
+                {/* Dark Overlay for inactive cards */}
+                {!isSelected && <View style={styles.inactiveOverlay} />}
+
                 <LinearGradient
                   colors={c.color}
                   style={StyleSheet.absoluteFill}
@@ -195,47 +293,85 @@ export default function SignupScreen() {
                   end={{ x: 0, y: 0 }}
                 />
                 
+                {/* Border Overlay */}
+                <View style={[
+                  StyleSheet.absoluteFill, 
+                  { 
+                    borderWidth: isSelected ? 2 : 1, 
+                    borderColor: borderColor,
+                    borderRadius: 4
+                  } 
+                ]} />
+
                 {!isSelected && (
                   <View style={styles.classTitleVertical}>
-                    <Text style={styles.classTitleTextVertical}>{c.name.toUpperCase()}</Text>
+                    <Text style={styles.classTitleTextVertical}>{c.name}</Text>
                   </View>
                 )}
 
                 {isSelected && (
                   <MotiView 
-                    from={{ opacity: 0, translateY: 10 }}
+                    from={{ opacity: 0, translateY: 20 }}
                     animate={{ opacity: 1, translateY: 0 }}
                     style={styles.classSelectedContent}
                   >
                     <View style={styles.classIconRow}>
-                      <View style={styles.classIconBadge}>
-                        <Text style={{fontSize: 16}}>{c.icon}</Text>
+                      <Image source={c.icon} style={styles.classIconImage} resizeMode="contain" />
+                      <View>
+                        <Text style={styles.classSelectedTitle}>{c.name}</Text>
+                        <Text style={styles.classSelectedSubtitle}>{c.subtitle}</Text>
                       </View>
-                      <Text style={styles.classSelectedTitle}>{c.name.toUpperCase()}</Text>
                     </View>
+                    
                     <Text style={styles.classDesc}>{c.desc}</Text>
                     
-                    <TouchableOpacity
-                      onPress={handleClassAwaken}
-                      disabled={loading}
-                      style={styles.confirmClassBtn}
-                    >
-                      <Text style={styles.confirmClassText}>
-                        {loading ? 'FINALIZING...' : 'CONFIRM SELECTION'} <Text style={{color: '#06b6d4'}}>→</Text>
-                      </Text>
-                    </TouchableOpacity>
+                    {/* Stats Section */}
+                    <View style={styles.statsContainer}>
+                      {Object.entries(c.stats).map(([stat, value]) => (
+                        <View key={stat} style={styles.statRow}>
+                          <View style={styles.statLabelRow}>
+                            <Text style={styles.statLabel}>{stat}</Text>
+                            <Text style={styles.statValue}>{value}</Text>
+                          </View>
+                          <View style={styles.statBarBg}>
+                            <MotiView 
+                              from={{ width: '0%' }}
+                              animate={{ width: `${value}%` }}
+                              transition={{ type: 'timing', duration: 1000 }}
+                              style={styles.statBarFill}
+                            />
+                          </View>
+                        </View>
+                      ))}
+                    </View>
+
                   </MotiView>
                 )}
               </TouchableOpacity>
             );
           })}
-        </ScrollView>
+        </View>
         
+        {/* Action Button Section */}
+        <View style={{ paddingHorizontal: 20, paddingBottom: 30, alignItems: 'center' }}>
+            <TouchableOpacity
+              onPress={handleClassAwaken}
+              disabled={loading || !selectedClass}
+              style={[styles.confirmClassBtn, !selectedClass && { opacity: 0.5 }]}
+            >
+              <Text style={styles.confirmClassText}>
+                {loading ? 'FINALIZING...' : 'CONFIRM SELECTION'} <Text style={{color: '#06b6d4'}}>→</Text>
+              </Text>
+            </TouchableOpacity>
+
+            <View style={styles.footerDataRow}>
+                <Text style={styles.footerDataText}>DATA_VERSION: 1.0.4</Text>
+                <View style={styles.footerDot} />
+                <Text style={styles.footerDataText}>ENCRYPTION: AES-256</Text>
+            </View>
+        </View>
+
         {systemError && <Text style={styles.errorText}>{systemError}</Text>}
-        
-        <TouchableOpacity onPress={() => setStep('verify')} style={styles.backLink}>
-          <Text style={styles.backLinkText}>← BACK</Text>
-        </TouchableOpacity>
       </View>
     );
   };
@@ -579,36 +715,68 @@ const styles = StyleSheet.create({
   // Class Path
   classContainer: {
     flex: 1,
-    paddingTop: 20,
-    paddingHorizontal: 4,
+    paddingTop: 10,
+    width: '100%',
   },
-  classScroll: {
-    paddingHorizontal: 10,
+  hudHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    marginBottom: 20,
+    width: '100%',
+  },
+  hudRow: {
+    flexDirection: 'row',
     alignItems: 'center',
-    height: 500, // Fixed height for the row
+    gap: 6,
+    marginBottom: 2,
+  },
+  statusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#22d3ee',
+  },
+  hudText: {
+    fontSize: 10,
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+    color: '#22d3ee',
+    letterSpacing: 2,
+    fontWeight: 'bold',
+  },
+  hudTime: {
+    fontSize: 12,
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+    color: '#22d3ee',
+    letterSpacing: 2,
+    fontWeight: 'bold',
+  },
+  accordionContainer: {
+    flexDirection: 'row',
+    height: 550,
+    width: '100%',
+    paddingHorizontal: 4,
+    gap: 2,
   },
   classCard: {
-    width: 80, // Default collapsed width
-    height: 450,
-    marginHorizontal: 4,
-    borderRadius: 8,
+    // Flex is handled by specific state styles
+    height: '100%',
+    borderRadius: 4,
     overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
     position: 'relative',
   },
   classCardInactive: {
-    opacity: 0.6,
-    // grayscale logic would need an overlay
+    flex: 1,
+    opacity: 0.8, // Reduced opacity handled by overlay
   },
   classCardSelected: {
-    width: 300, // Expanded width
-    borderColor: '#22d3ee',
-    borderWidth: 2,
-    shadowColor: '#06b6d4',
-    shadowRadius: 20,
-    shadowOpacity: 0.6,
+    flex: 5, // Expands to take 5x space
     opacity: 1,
+  },
+  inactiveOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    zIndex: 10,
   },
   classTitleVertical: {
     position: 'absolute',
@@ -618,14 +786,15 @@ const styles = StyleSheet.create({
     bottom: 0,
     justifyContent: 'center',
     alignItems: 'center',
+    zIndex: 20,
   },
   classTitleTextVertical: {
-    color: 'rgba(255,255,255,0.4)',
-    fontSize: 20,
+    color: 'rgba(255,255,255,0.6)',
+    fontSize: 16, // Smaller for narrow columns
     fontWeight: '900',
     letterSpacing: 4,
     transform: [{ rotate: '-90deg' }],
-    width: 400, // Ensure enough width for text before rotation
+    width: 500, 
     textAlign: 'center',
   },
   classSelectedContent: {
@@ -634,43 +803,114 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     padding: 20,
-    backgroundColor: 'rgba(0,0,0,0.6)',
+    backgroundColor: 'rgba(0,0,0,0.8)', // Darker bg for readability
+    paddingTop: 40,
   },
   classIconRow: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 8,
+    gap: 12,
   },
-  classIconBadge: {
-    backgroundColor: '#06b6d4',
-    padding: 4,
-    borderRadius: 4,
-    marginRight: 8,
+  classIconImage: {
+    width: 60,
+    height: 60,
   },
   classSelectedTitle: {
     color: 'white',
-    fontSize: 24,
+    fontSize: 32,
     fontWeight: '900',
     letterSpacing: 1,
+    textShadowColor: 'rgba(59, 130, 246, 0.5)',
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 10,
+  },
+  classSelectedSubtitle: {
+    color: '#60a5fa',
+    fontSize: 10,
+    fontWeight: 'bold',
+    letterSpacing: 2,
   },
   classDesc: {
-    color: '#e5e7eb', // gray-200
+    color: 'rgba(255,255,255,0.8)', 
     fontSize: 10,
     fontFamily: 'Rajdhani-Medium',
-    textTransform: 'uppercase',
     marginBottom: 16,
+    lineHeight: 14,
+  },
+  statsContainer: {
+    marginTop: 8,
+    gap: 8,
+  },
+  statRow: {
+    marginBottom: 4,
+  },
+  statLabelRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 2,
+  },
+  statLabel: {
+    color: 'rgba(255,255,255,0.6)',
+    fontSize: 10,
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+    fontWeight: 'bold',
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+  },
+  statValue: {
+    color: '#22d3ee',
+    fontSize: 10,
+    fontWeight: 'bold',
+  },
+  statBarBg: {
+    height: 4,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    borderRadius: 2,
+    overflow: 'hidden',
+  },
+  statBarFill: {
+    height: '100%',
+    backgroundColor: '#22d3ee',
+    shadowColor: '#22d3ee',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.8,
+    shadowRadius: 5,
   },
   confirmClassBtn: {
-    backgroundColor: 'rgba(0,0,0,0.6)',
+    width: '100%',
+    maxWidth: 300,
+    backgroundColor: 'rgba(0,0,0,0.8)',
     borderWidth: 1,
     borderColor: '#06b6d4',
-    paddingVertical: 12,
+    paddingVertical: 16,
     alignItems: 'center',
+    marginTop: 20,
   },
   confirmClassText: {
     color: 'white',
-    fontSize: 10,
+    fontSize: 12,
     fontWeight: '900',
+    letterSpacing: 3,
+    textTransform: 'uppercase',
+  },
+  footerDataRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 16,
+    opacity: 0.3,
+    gap: 10,
+  },
+  footerDataText: {
+    color: 'white',
+    fontSize: 8,
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
     letterSpacing: 2,
+  },
+  footerDot: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: 'white',
   },
 });

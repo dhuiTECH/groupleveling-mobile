@@ -58,9 +58,11 @@ export const ShopItemMedia = ({
   }
 
   // --- STATIC RENDER ---
+  const finalImageSrc = item.thumbnail_url || imageSrc;
+
   return (
     <Image
-      source={imageSrc ? { uri: imageSrc } : require('../../assets/NoobMan.png')}
+      source={finalImageSrc ? { uri: finalImageSrc } : require('../../assets/NoobMan.png')}
       style={style}
       resizeMode={resizeMode}
     />

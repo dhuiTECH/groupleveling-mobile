@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, Image, TouchableOpacity, ImageBackground } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 
 interface DungeonViewProps {
   user: any;
@@ -21,60 +22,60 @@ const DungeonView: React.FC<DungeonViewProps> = (props) => {
     <View style={styles.container}>
       <View style={styles.header}>
         <Image source={require('../../assets/exclamation.png')} style={styles.skullIcon} />
-        <Text style={styles.headerTitle}>SPECIAL INSTANCES</Text>
+        <Text style={styles.headerTitle}>SPECIAL_INSTANCES</Text>
       </View>
 
-      <View style={styles.dungeonCard}>
+      <TouchableOpacity 
+        style={styles.dungeonCard}
+        onPress={() => {}}
+        activeOpacity={0.9}
+      >
         <ImageBackground 
           source={require('../../assets/gates.png')} 
           style={styles.backgroundImage}
-          imageStyle={{ borderRadius: 20 }}
+          imageStyle={{ borderRadius: 8 }}
         >
+          <LinearGradient
+            colors={['rgba(2, 6, 23, 0.4)', 'rgba(2, 6, 23, 0.9)']}
+            style={StyleSheet.absoluteFill}
+          />
           <View style={styles.overlay}>
             <View style={styles.cardHeader}>
               <View style={styles.rankBadge}>
                 <Text style={styles.rankText}>E-RANK</Text>
               </View>
               <View style={styles.timeContainer}>
-                <Text style={styles.timeText}>🕒 JAN 31, 2026 3:00 PM PST</Text>
+                <Text style={styles.timeText}>TIME_REMAINING: 04:22:15</Text>
               </View>
             </View>
 
-            <Text style={styles.dungeonTitle}>THE SUNDAY TRACK RAID</Text>
-
-            <View style={styles.rewardsContainer}>
-              <View style={styles.rewardItem}>
-                <Image source={require('../../assets/expcrystal.png')} style={styles.rewardIcon} />
-                <Text style={styles.rewardText}>500 XP</Text>
+            <View style={styles.contentMiddle}>
+              <Text style={styles.dungeonTitle}>THE SUNDAY TRACK RAID</Text>
+              <View style={styles.rewardsRow}>
+                <View style={styles.rewardItem}>
+                  <Image source={require('../../assets/expcrystal.png')} style={styles.rewardIcon} />
+                  <Text style={styles.rewardText}>500 XP</Text>
+                </View>
+                <View style={styles.rewardItem}>
+                  <Image source={require('../../assets/coinicon.png')} style={styles.rewardIcon} />
+                  <Text style={[styles.rewardText, { color: '#fbbf24' }]}>100G</Text>
+                </View>
               </View>
-              <View style={styles.rewardItem}>
-                <Image source={require('../../assets/coinicon.png')} style={styles.rewardIcon} />
-                <Text style={[styles.rewardText, { color: '#fbbf24' }]}>100</Text>
-              </View>
-            </View>
-
-            <View style={styles.detailsContainer}>
-              <Text style={styles.detailText}>• REQ: 10KM</Text>
-              <Text style={styles.detailText}>• BOSS: INTERVAL OGRE</Text>
             </View>
 
             <View style={styles.footer}>
-              <View style={styles.partyContainer}>
-                <Text style={styles.partyLabel}>PARTY (1)</Text>
-                <View style={styles.partyMembers}>
-                   {/* Avatar placeholders */}
-                   <View style={styles.partyAvatar} />
-                   <Text style={styles.viewAll}>VIEW ALL</Text>
-                </View>
+              <View style={styles.detailsContainer}>
+                <Text style={styles.detailText}>OBJ: 10KM INTERVAL_RUN</Text>
+                <Text style={styles.detailText}>BOSS: INTERVAL_OGRE</Text>
               </View>
               
-              <TouchableOpacity style={styles.dropoutButton}>
-                <Text style={styles.dropoutText}>DROP OUT</Text>
+              <TouchableOpacity style={styles.enterButton}>
+                <Text style={styles.enterButtonText}>ENTER</Text>
               </TouchableOpacity>
             </View>
           </View>
         </ImageBackground>
-      </View>
+      </TouchableOpacity>
     </View>
   );
 };
@@ -99,21 +100,21 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '900',
     color: '#3b82f6',
-    letterSpacing: 3,
+    letterSpacing: 4,
   },
   dungeonCard: {
-    height: 250,
-    borderRadius: 20,
+    height: 220,
+    borderRadius: 8,
     overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(34, 211, 238, 0.3)',
   },
   backgroundImage: {
     flex: 1,
-    justifyContent: 'flex-end',
   },
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.4)',
-    padding: 20,
+    padding: 15,
     justifyContent: 'space-between',
   },
   cardHeader: {
@@ -124,39 +125,42 @@ const styles = StyleSheet.create({
   rankBadge: {
     backgroundColor: '#06b6d4',
     paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 4,
+    paddingVertical: 2,
+    borderRadius: 2,
   },
   rankText: {
     fontSize: 10,
     fontWeight: '900',
     color: '#fff',
-  },
-  timeContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    letterSpacing: 1,
   },
   timeText: {
     fontSize: 8,
-    color: '#cbd5e1',
+    color: '#22d3ee',
     fontWeight: 'bold',
+    letterSpacing: 1,
+  },
+  contentMiddle: {
+    marginTop: 10,
   },
   dungeonTitle: {
-    fontSize: 18,
+    fontSize: 22,
     fontWeight: '900',
     color: '#fff',
-    fontStyle: 'italic',
-    marginTop: 8,
+    letterSpacing: 1,
+    textShadowColor: 'rgba(34, 211, 238, 0.5)',
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 10,
   },
-  rewardsContainer: {
+  rewardsRow: {
     flexDirection: 'row',
-    gap: 12,
-    marginTop: 8,
+    gap: 15,
+    marginTop: 5,
   },
   rewardItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 6,
   },
   rewardIcon: {
     width: 14,
@@ -165,61 +169,36 @@ const styles = StyleSheet.create({
   rewardText: {
     fontSize: 10,
     fontWeight: 'bold',
-    color: '#94a3b8',
-  },
-  detailsContainer: {
-    marginTop: 8,
-  },
-  detailText: {
-    fontSize: 10,
-    fontWeight: 'bold',
-    color: '#fbbf24',
-    textTransform: 'uppercase',
+    color: 'rgba(255, 255, 255, 0.7)',
   },
   footer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: 12,
+    alignItems: 'flex-end',
   },
-  partyContainer: {
-    gap: 4,
+  detailsContainer: {
+    flex: 1,
   },
-  partyLabel: {
-    fontSize: 8,
-    fontWeight: '900',
-    color: '#06b6d4',
-  },
-  partyMembers: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  partyAvatar: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: '#475569',
-    borderWidth: 1,
-    borderColor: '#fff',
-  },
-  viewAll: {
-    fontSize: 8,
+  detailText: {
+    fontSize: 9,
     fontWeight: 'bold',
-    color: '#3b82f6',
-    textDecorationLine: 'underline',
+    color: 'rgba(34, 211, 238, 0.6)',
+    letterSpacing: 1,
+    marginBottom: 2,
   },
-  dropoutButton: {
-    backgroundColor: '#ef4444',
-    paddingHorizontal: 16,
+  enterButton: {
+    backgroundColor: 'rgba(6, 182, 212, 0.2)',
+    paddingHorizontal: 20,
     paddingVertical: 10,
     borderRadius: 4,
-    transform: [{ skewX: '-10deg' }],
+    borderWidth: 1,
+    borderColor: '#06b6d4',
   },
-  dropoutText: {
+  enterButtonText: {
     color: '#fff',
     fontSize: 12,
     fontWeight: '900',
+    letterSpacing: 2,
   },
 });
 

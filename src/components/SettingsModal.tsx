@@ -13,6 +13,7 @@ import { MotiView } from 'moti';
 import { SystemGlass } from './ui/SystemGlass';
 import { GlowText } from './ui/GlowText';
 import { TechButton } from './ui/TechButton';
+import { playHunterSound } from '../utils/audio';
 
 interface SettingsModalProps {
   visible: boolean;
@@ -57,6 +58,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   <TouchableOpacity 
                     style={styles.menuItem} 
                     onPress={() => {
+                      playHunterSound('click');
                       onClose();
                       onChat();
                     }}
@@ -74,6 +76,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   <TouchableOpacity 
                     style={[styles.menuItem, styles.logoutItem]} 
                     onPress={() => {
+                      playHunterSound('click');
                       onClose();
                       onLogout();
                     }}

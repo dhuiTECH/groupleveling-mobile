@@ -14,6 +14,10 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
+import { MotiView, AnimatePresence } from 'moti';
+import * as Haptics from 'expo-haptics';
+import { playHunterSound } from '../utils/audio';
+
 // Import existing icons
 import { LockIcon } from '../components/icons/LockIcon';
 import { XIcon } from '../components/icons/XIcon';
@@ -36,7 +40,8 @@ export const InventoryScreen: React.FC = () => {
   const { user, setUser, isLoading } = useAuth();
   const { shopItems, equippedItems, totalStats, refreshGameData } = useGameData();
   const { fetchData } = useApi();
-  // Mock put for now as useApi doesn't export it
+  
+  // Use actual API if available, or mock it properly
   const put = async (url: string, body: any) => { 
     console.log('Mock PUT:', url, body); 
     return { success: true, message: 'Updated' }; 
@@ -51,38 +56,45 @@ export const InventoryScreen: React.FC = () => {
 
   if (isLoading) {
     return (
-      <SafeAreaView style={[styles.container, { paddingTop: insets.top }]}>
-        <Text style={styles.loadingText}>Loading user data...</Text>
-      </SafeAreaView>
+      <View style={styles.container}>
+        <SafeAreaView style={[styles.container, { paddingTop: insets.top, justifyContent: 'center' }]}>
+          <Text style={styles.loadingText}>INITIALIZING_SYSTEM...</Text>
+        </SafeAreaView>
+      </View>
     );
   }
 
   if (!user) {
     return (
-      <SafeAreaView style={[styles.container, { paddingTop: insets.top, alignItems: 'center', justifyContent: 'center' }]}>
-        <Text style={[styles.loadingText, { marginBottom: 20 }]}>Access Restricted. Hunter License Required.</Text>
-        <TouchableOpacity 
-          style={{ 
-            backgroundColor: 'rgba(6, 182, 212, 0.2)', 
-            paddingHorizontal: 24, 
-            paddingVertical: 12, 
-            borderRadius: 4,
-            borderWidth: 1,
-            borderColor: '#06b6d4'
-          }}
-          onPress={() => navigation.navigate('Login' as any)}
-        >
-          <Text style={{ color: '#06b6d4', fontWeight: '900', textTransform: 'uppercase', letterSpacing: 1 }}>Login System</Text>
-        </TouchableOpacity>
-      </SafeAreaView>
+      <View style={styles.container}>
+        <SafeAreaView style={[styles.container, { paddingTop: insets.top, alignItems: 'center', justifyContent: 'center' }]}>
+          <Text style={[styles.loadingText, { marginBottom: 20 }]}>ACCESS_RESTRICTED. HUNTER_LICENSE_REQUIRED.</Text>
+          <TouchableOpacity 
+            style={{ 
+              backgroundColor: 'rgba(6, 182, 212, 0.2)', 
+              paddingHorizontal: 24, 
+              paddingVertical: 12, 
+              borderRadius: 4,
+              borderWidth: 1,
+              borderColor: '#06b6d4'
+            }}
+            onPress={() => navigation.navigate('Login' as any)}
+          >
+            <Text style={{ color: '#06b6d4', fontWeight: '900', textTransform: 'uppercase', letterSpacing: 1 }}>LOGIN_SYSTEM</Text>
+          </TouchableOpacity>
+        </SafeAreaView>
+      </View>
     );
   }
 
-  const level = calculateLevel(user.exp);
-  const rank = getRank(level);
+  const level = calculateLevel(user.exp || 0);
+  const playerRank = getRank(level);
 
   const handleEquipCosmetic = useCallback(async (cosmeticId: string, equipped: boolean) => {
     if (!user) return;
+    
+    playHunterSound(equipped ? 'equip' : 'click');
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
     const updatedCosmetics = user.cosmetics?.map(c =>
       c.id === cosmeticId ? { ...c, equipped: equipped } : c
@@ -183,53 +195,75 @@ export const InventoryScreen: React.FC = () => {
 
   return (
     <View style={styles.container}>
+      <LinearGradient
+        colors={['#020617', '#0f172a', '#020617']}
+        style={StyleSheet.absoluteFill}
+      />
+      
       <SafeAreaView style={{ flex: 1, paddingTop: Platform.OS === 'android' ? insets.top : 0 }}>
-      <ScrollView
-        style={styles.scrollViewContent}
-        contentContainerStyle={{ paddingBottom: 20 }}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Main Avatar Section */}
-        <View style={styles.avatarSection}>
-          <View style={styles.avatarContainer}>
-            <LayeredAvatar user={user} size={width < 640 ? width * 0.7 : 224} onAvatarClick={() => setSelectedAvatar(user)} />
-            <View style={styles.avatarButtonsContainer}>
-              <TouchableOpacity
-                onPress={() => setShowAvatarModal(true)}
-                style={styles.avatarButton}
-              >
-                <Image source={require('../../assets/changeavatar.png')} style={styles.avatarButtonIcon} />
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => setShowBackgroundModal(true)}
-                style={styles.backgroundButton}
-              >
-                <Image source={require('../../assets/backgroundicon.png')} style={styles.avatarButtonIcon} />
-              </TouchableOpacity>
-            </View>
+        {/* HUD Header */}
+        <View style={styles.hudHeader}>
+          <View style={styles.hudLeft}>
+            <Text style={styles.hudLabel}>HUNTER_ID</Text>
+            <Text style={styles.hudValue}>{user.name || 'UNKNOWN'}</Text>
           </View>
-          <Text style={styles.userName}>{user.name || 'Adventurer'}</Text>
-          <View style={styles.statsContainer}>
-            <View style={styles.statItem}>
-              <Text style={styles.statLabel}>Rank</Text>
-              <Text style={[styles.statValue, { color: RANK_COLORS[rank] || '#fff' }]}>{rank}</Text>
-            </View>
-            <View style={styles.statDivider} />
-            <View style={styles.statItem}>
-              <Text style={styles.statLabel}>Level</Text>
-              <Text style={styles.statValue}>{level}</Text>
-            </View>
-            <View style={styles.statDivider} />
-            <View style={styles.statItem}>
-              <Text style={styles.statLabel}>Power</Text>
-              <Text style={[styles.statValue, { color: RANK_COLORS['C'] }]}>
-                {Object.values(totalStats || {}).reduce((sum: number, val: any) => {
-                  return sum + (typeof val === 'number' ? val : 0);
-                }, 0)}
-              </Text>
-            </View>
+          <View style={styles.hudRight}>
+            <Text style={styles.hudLabel}>RANK</Text>
+            <Text style={[styles.hudValue, { color: RANK_COLORS[playerRank] || '#fff' }]}>{playerRank}</Text>
           </View>
         </View>
+
+        <ScrollView
+          style={styles.scrollViewContent}
+          contentContainerStyle={{ paddingBottom: 100 }}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Main Avatar Section */}
+          <MotiView 
+            from={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            style={styles.avatarSection}
+          >
+            <View style={styles.avatarContainer}>
+              <LayeredAvatar user={user} size={width < 640 ? width * 0.7 : 224} onAvatarClick={() => setSelectedAvatar(user)} />
+              <View style={styles.avatarButtonsContainer}>
+                <TouchableOpacity
+                  onPress={() => {
+                    playHunterSound('click');
+                    setShowAvatarModal(true);
+                  }}
+                  style={styles.avatarButton}
+                >
+                  <Image source={require('../../assets/changeavatar.png')} style={styles.avatarButtonIcon} />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => {
+                    playHunterSound('click');
+                    setShowBackgroundModal(true);
+                  }}
+                  style={styles.backgroundButton}
+                >
+                  <Image source={require('../../assets/backgroundicon.png')} style={styles.avatarButtonIcon} />
+                </TouchableOpacity>
+              </View>
+            </View>
+            
+            <View style={styles.statsContainer}>
+              <View style={styles.statItem}>
+                <Text style={styles.statLabel}>LEVEL</Text>
+                <Text style={styles.statValue}>{level}</Text>
+              </View>
+              <View style={styles.statDivider} />
+              <View style={styles.statItem}>
+                <Text style={styles.statLabel}>COMBAT_POWER</Text>
+                <Text style={[styles.statValue, { color: '#fbbf24' }]}>
+                  {Object.values(totalStats || {}).reduce((sum: number, val: any) => {
+                    return sum + (typeof val === 'number' ? val : 0);
+                  }, 0)}
+                </Text>
+              </View>
+            </View>
+          </MotiView>
 
         {/* Equipped Items Section */}
         <View style={styles.section}>
@@ -768,122 +802,136 @@ export const InventoryScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0f172a',
+    backgroundColor: '#020617',
+  },
+  hudHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(34, 211, 238, 0.2)',
+  },
+  hudLeft: {
+    alignItems: 'flex-start',
+  },
+  hudRight: {
+    alignItems: 'flex-end',
+  },
+  hudLabel: {
+    color: 'rgba(34, 211, 238, 0.6)',
+    fontSize: 8,
+    fontWeight: '900',
+    letterSpacing: 2,
+  },
+  hudValue: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '900',
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+    textTransform: 'uppercase',
   },
   scrollViewContent: {
     flexGrow: 1,
-    // Removed paddingBottom here as it's now set directly on contentContainerStyle
   },
   loadingText: {
-    color: '#fff',
+    color: '#22d3ee',
     textAlign: 'center',
     marginTop: 50,
-    fontSize: 16,
+    fontSize: 12,
+    fontWeight: 'bold',
+    letterSpacing: 2,
   },
-
   // Avatar Section
   avatarSection: {
     flexDirection: 'column',
     alignItems: 'center',
-    paddingVertical: 24,
+    paddingVertical: 30,
   },
   avatarContainer: {
     position: 'relative',
+    shadowColor: '#3b82f6',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
   },
   avatarButtonsContainer: {
     position: 'absolute',
-    top: 8,
-    right: -48,
+    top: 0,
+    right: -60,
     flexDirection: 'column',
-    gap: 8,
+    gap: 12,
   },
   avatarButton: {
-    padding: 8,
-    backgroundColor: 'rgba(202, 138, 4, 0.8)', // yellow-600/80
-    borderColor: 'rgba(202, 138, 4, 0.5)', // yellow-500/50
+    padding: 10,
+    backgroundColor: 'rgba(6, 182, 212, 0.2)',
+    borderColor: '#06b6d4',
     borderWidth: 1,
     borderRadius: 4,
-    shadowColor: 'rgba(202, 138, 4, 0.2)', // shadow-yellow-500/20
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 1,
-    shadowRadius: 6,
-    elevation: 5, // For Android shadow
-    // clip-tech-button - approximated with borderRadius and manual shadow
   },
   backgroundButton: {
-    padding: 8,
-    backgroundColor: 'rgba(15, 23, 42, 0.8)', // slate-900/80
-    borderColor: 'rgba(255, 255, 255, 0.1)', // white/10
+    padding: 10,
+    backgroundColor: 'rgba(15, 23, 42, 0.8)',
+    borderColor: 'rgba(255, 255, 255, 0.1)',
     borderWidth: 1,
     borderRadius: 4,
-    shadowColor: 'transparent', // No specific shadow in original for this
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0,
-    shadowRadius: 0,
   },
   avatarButtonIcon: {
-    width: 24,
-    height: 24,
+    width: 20,
+    height: 20,
     resizeMode: 'contain',
-  },
-  userName: {
-    marginTop: 16,
-    fontSize: 20,
-    // fontFamily: 'Avenir-Heavy', // Example font, replace with actual font if available
-    fontWeight: '900',
-    textTransform: 'uppercase',
-    textAlign: 'center',
-    color: '#06b6d4', // cyan-400
+    tintColor: '#fff',
   },
   statsContainer: {
     flexDirection: 'row',
-    gap: 12,
-    marginTop: 12,
-    justifyContent: 'center',
+    gap: 30,
+    marginTop: 24,
+    backgroundColor: 'rgba(15, 23, 42, 0.8)',
+    paddingHorizontal: 30,
+    paddingVertical: 15,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
   },
   statItem: {
     alignItems: 'center',
   },
   statLabel: {
-    fontSize: 9,
-    color: '#06b6d4', // cyan-400
-    // fontFamily: 'Avenir-Heavy',
-    fontWeight: 'bold',
+    fontSize: 8,
+    color: 'rgba(255, 255, 255, 0.5)',
+    fontWeight: '900',
     textTransform: 'uppercase',
-    letterSpacing: 1,
+    letterSpacing: 2,
+    marginBottom: 4,
   },
   statValue: {
-    fontSize: 16,
-    // fontFamily: 'Avenir-Heavy',
+    fontSize: 18,
     fontWeight: '900',
-    color: '#3b82f6', // blue-400, for level
+    color: '#22d3ee',
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
   },
   statDivider: {
     width: 1,
-    height: 16,
-    backgroundColor: '#1f2937', // gray-800
+    height: 30,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
     alignSelf: 'center',
   },
-
   // Section General
   section: {
     marginHorizontal: 16,
-    marginBottom: 24,
+    marginBottom: 30,
   },
   sectionHeader: {
     fontSize: 10,
-    // fontFamily: 'Avenir-Heavy',
     fontWeight: '900',
     textTransform: 'uppercase',
-    letterSpacing: 1.5,
-    // color: '#22c55e', // green-500 - will be dynamic
-    marginBottom: 12,
-    paddingVertical: 8,
-    backgroundColor: 'rgba(15, 23, 42, 0.7)', // system-glass like effect
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
-    paddingHorizontal: 12,
-    borderRadius: 4,
+    letterSpacing: 3,
+    marginBottom: 16,
+    paddingVertical: 10,
+    backgroundColor: 'rgba(34, 211, 238, 0.1)',
+    borderLeftWidth: 4,
+    borderLeftColor: '#22d3ee',
+    paddingHorizontal: 15,
   },
 
   // Equipped Items Grid
@@ -896,25 +944,22 @@ const styles = StyleSheet.create({
   equippedSlot: {
     flex: 1,
     aspectRatio: 1,
-    minWidth: width < 640 ? '18%' : '19%', // Approx 1/5 with some gap, responsive
+    minWidth: width < 640 ? '18%' : '19%',
     maxWidth: width < 640 ? '19%' : '19%',
     flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
     padding: 8,
-    borderRadius: 2,
+    borderRadius: 4,
     borderWidth: 1,
     position: 'relative',
     overflow: 'hidden',
-    backgroundColor: 'rgba(15, 23, 42, 0.8)', // slate-900/80
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.15,
-    shadowRadius: 10,
-    elevation: 2, 
+    backgroundColor: 'rgba(15, 23, 42, 0.9)',
+    borderColor: 'rgba(255, 255, 255, 0.05)',
   },
   emptySlot: {
-    backgroundColor: 'rgba(0, 0, 0, 0.4)', // black/40
-    borderColor: '#1f2937', // gray-800
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+    borderColor: 'rgba(255, 255, 255, 0.05)',
     borderStyle: 'dashed',
   },
   equippedItemContent: {
@@ -1082,20 +1127,15 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(15, 23, 42, 0.6)', 
   },
   inventoryFilterButtonActive: {
-    backgroundColor: 'rgba(234, 88, 12, 0.8)', 
-    borderColor: 'rgba(234, 88, 12, 0.5)', 
-    shadowColor: 'rgba(234, 88, 12, 0.2)', 
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 1,
-    shadowRadius: 6,
-    elevation: 5,
+    backgroundColor: '#22d3ee',
+    borderColor: '#22d3ee',
   },
   inventoryFilterButtonText: {
     fontSize: 8,
-    // fontFamily: 'Avenir-Heavy',
-    fontWeight: 'bold',
+    fontWeight: '900',
     textTransform: 'uppercase',
-    color: '#e2e8f0', 
+    color: '#fff',
+    letterSpacing: 1,
   },
   sortButton: {
     paddingHorizontal: 8,
@@ -1106,20 +1146,15 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(15, 23, 42, 0.6)', 
   },
   sortButtonActive: {
-    backgroundColor: 'rgba(37, 99, 235, 0.8)', 
-    borderColor: 'rgba(37, 99, 235, 0.5)', 
-    shadowColor: 'rgba(37, 99, 235, 0.2)', 
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 1,
-    shadowRadius: 6,
-    elevation: 5,
+    backgroundColor: '#3b82f6',
+    borderColor: '#3b82f6',
   },
   sortButtonText: {
     fontSize: 8,
-    // fontFamily: 'Avenir-Heavy',
-    fontWeight: 'bold',
+    fontWeight: '900',
     textTransform: 'uppercase',
-    color: '#e2e8f0', 
+    color: '#fff',
+    letterSpacing: 1,
   },
   inventoryGrid: {
     flexDirection: 'row',
@@ -1136,25 +1171,22 @@ const styles = StyleSheet.create({
     marginTop: 20,
   },
   inventoryItemCard: {
-    width: width < 640 ? '30%' : '23%', // Responsive width for grid items
+    width: width < 640 ? '30%' : '23%',
     aspectRatio: 1,
-    padding: 12,
+    padding: 8,
     flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 2,
+    borderRadius: 4,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)', 
-    backgroundColor: 'rgba(15, 23, 42, 0.8)', 
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: 'rgba(15, 23, 42, 0.9)',
     overflow: 'hidden',
+    position: 'relative',
   },
   inventoryItemCardEquipped: {
-    backgroundColor: 'rgba(22, 101, 52, 0.2)', 
-    shadowColor: 'rgba(34, 197, 94, 0.2)', 
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 1,
-    shadowRadius: 8,
-    elevation: 5,
+    borderColor: '#22c55e',
+    backgroundColor: 'rgba(34, 197, 94, 0.05)',
   },
   inventoryItemMediaWrapper: {
     position: 'relative',
@@ -1195,23 +1227,27 @@ const styles = StyleSheet.create({
   },
   equipUnequipButton: {
     width: '100%',
-    paddingVertical: 6,
-    borderBottomWidth: 2, 
-    borderBottomColor: 'rgba(0, 0, 0, 0.4)', 
+    paddingVertical: 4,
+    borderRadius: 2,
+    marginTop: 'auto',
   },
   equipButton: {
-    backgroundColor: 'rgba(22, 163, 74, 0.8)', 
+    backgroundColor: 'rgba(34, 197, 94, 0.2)',
+    borderWidth: 1,
+    borderColor: '#22c55e',
   },
   unequipButton: {
-    backgroundColor: 'rgba(71, 85, 105, 0.8)', 
+    backgroundColor: 'rgba(239, 68, 68, 0.2)',
+    borderWidth: 1,
+    borderColor: '#ef4444',
   },
   equipUnequipButtonText: {
-    fontSize: 8,
-    // fontFamily: 'Avenir-Heavy',
+    fontSize: 7,
     fontWeight: '900',
     textTransform: 'uppercase',
     textAlign: 'center',
     color: '#fff',
+    letterSpacing: 1,
   },
 
   // Modals General
