@@ -33,34 +33,53 @@ export function AuthProvider({ children }: AuthProviderProps): JSX.Element {
         setSupabaseUser(session.user);
         
         // Fetch full profile from DB
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', session.user.id)
-          .single();
+        try {
+          const { data: profile, error: profileError } = await supabase
+            .from('profiles')
+            .select(`
+              *,
+              cosmetics:user_cosmetics(
+                id,
+                equipped,
+                shop_item_id,
+                created_at:acquired_at,
+                shop_items:shop_item_id(*)
+              )
+            `)
+            .eq('id', session.user.id)
+            .single();
 
-        setUser({
-          id: session.user.id,
-          email: session.user.email || '',
-          name: profile?.hunter_name || session.user.user_metadata?.display_name || 'User',
-          level: profile?.level || 1,
-          exp: profile?.exp || 0,
-          coins: profile?.coins || 0,
-          gems: profile?.gems || 0,
-          current_class: profile?.current_class,
-          gender: profile?.gender,
-          onboarding_completed: profile?.onboarding_completed,
-          cosmetics: [], // Need to fetch cosmetics separately or via join
-          submittedIds: [],
-          slotsUsed: 0,
-          createdAt: new Date(profile?.created_at || new Date()),
-          updatedAt: new Date(profile?.updated_at || new Date()),
-          current_hp: profile?.current_hp,
-          max_hp: profile?.max_hp,
-          current_mp: profile?.current_mp,
-          max_mp: profile?.max_mp,
-          profilePicture: profile?.avatar ? { uri: profile.avatar } : require('../../assets/sungjinwoo.png'), // Handle avatar URL or local asset
-        } as User);
+          if (profileError) {
+            console.error('Error fetching profile:', profileError);
+          }
+
+          if (profile) {
+            setUser({
+              id: session.user.id,
+              email: session.user.email || '',
+              name: profile.hunter_name || session.user.user_metadata?.display_name || 'User',
+              level: profile.level || 1,
+              exp: Number(profile.exp) || 0,
+              coins: Number(profile.coins) || 0,
+              gems: profile.gems || 0,
+              current_class: profile.current_class,
+              gender: profile.gender,
+              onboarding_completed: profile.onboarding_completed,
+              cosmetics: profile.cosmetics || [],
+              submittedIds: [],
+              slotsUsed: 0,
+              createdAt: new Date(profile.created_at || new Date()),
+              updatedAt: new Date(profile.updated_at || new Date()),
+              current_hp: profile.current_hp,
+              max_hp: profile.max_hp,
+              current_mp: profile.current_mp,
+              max_mp: profile.max_mp,
+              profilePicture: profile.avatar ? { uri: profile.avatar } : require('../../assets/sungjinwoo.png'),
+            } as User);
+          }
+        } catch (err) {
+          console.error('Fatal error in getInitialSession:', err);
+        }
       }
       setIsLoading(false);
     };
@@ -72,34 +91,53 @@ export function AuthProvider({ children }: AuthProviderProps): JSX.Element {
       async (_event, session) => {
         setSupabaseUser(session?.user ?? null);
         if (session) {
-             const { data: profile } = await supabase
+          try {
+             const { data: profile, error: profileError } = await supabase
                 .from('profiles')
-                .select('*')
+                .select(`
+                  *,
+                  cosmetics:user_cosmetics(
+                    id,
+                    equipped,
+                    shop_item_id,
+                    created_at:acquired_at,
+                    shop_items:shop_item_id(*)
+                  )
+                `)
                 .eq('id', session.user.id)
                 .single();
 
-             setUser({
-              id: session.user.id,
-              email: session.user.email || '',
-              name: profile?.hunter_name || session.user.user_metadata?.display_name || 'User',
-              level: profile?.level || 1,
-              exp: profile?.exp || 0,
-              coins: profile?.coins || 0,
-              gems: profile?.gems || 0,
-              current_class: profile?.current_class,
-              gender: profile?.gender,
-              onboarding_completed: profile?.onboarding_completed,
-              cosmetics: [],
-              submittedIds: [],
-              slotsUsed: 0,
-              createdAt: new Date(profile?.created_at || new Date()),
-              updatedAt: new Date(profile?.updated_at || new Date()),
-              current_hp: profile?.current_hp,
-              max_hp: profile?.max_hp,
-              current_mp: profile?.current_mp,
-              max_mp: profile?.max_mp,
-              profilePicture: profile?.avatar ? { uri: profile.avatar } : require('../../assets/sungjinwoo.png'),
-            } as User);
+             if (profileError) {
+               console.error('Error fetching profile in onAuthStateChange:', profileError);
+             }
+
+             if (profile) {
+               setUser({
+                id: session.user.id,
+                email: session.user.email || '',
+                name: profile.hunter_name || session.user.user_metadata?.display_name || 'User',
+                level: profile.level || 1,
+                exp: Number(profile.exp) || 0,
+                coins: Number(profile.coins) || 0,
+                gems: profile.gems || 0,
+                current_class: profile.current_class,
+                gender: profile.gender,
+                onboarding_completed: profile.onboarding_completed,
+                cosmetics: profile.cosmetics || [],
+                submittedIds: [],
+                slotsUsed: 0,
+                createdAt: new Date(profile.created_at || new Date()),
+                updatedAt: new Date(profile.updated_at || new Date()),
+                current_hp: profile.current_hp,
+                max_hp: profile.max_hp,
+                current_mp: profile.current_mp,
+                max_mp: profile.max_mp,
+                profilePicture: profile.avatar ? { uri: profile.avatar } : require('../../assets/sungjinwoo.png'),
+              } as User);
+             }
+          } catch (err) {
+            console.error('Fatal error in onAuthStateChange:', err);
+          }
         } else {
           setUser(null);
         }

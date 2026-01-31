@@ -1,9 +1,11 @@
 // Converted React Native hooks file
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
 import { AppState } from 'react-native';
 import { ShopItem, UserCosmetic } from '../types/user';
+import { supabase } from '../lib/supabase';
+import { useAuth } from '../contexts/AuthContext';
 
 interface GameData {
   score: number;
@@ -17,7 +19,9 @@ const defaultGameData: GameData = {
 };
 
 export const useGameData = () => {
+  const { user, setUser } = useAuth();
   const [gameData, setGameData] = useState<GameData>(defaultGameData);
+  const [shopItems, setShopItems] = useState<ShopItem[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
 
   const GAME_DATA_KEY = 'gameData'; // Key for storing game data in AsyncStorage
@@ -35,11 +39,77 @@ export const useGameData = () => {
       }
     } catch (error) {
       console.error('Failed to load game data:', error);
-      // Handle error appropriately, e.g., show an error message to the user
     } finally {
       setLoading(false);
     }
   }, []);
+
+  const fetchShopItems = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from('shop_items')
+        .select('*');
+
+      if (error) throw error;
+      if (data) {
+        setShopItems(data as ShopItem[]);
+      }
+    } catch (error) {
+      console.error('Error fetching shop items:', error);
+    }
+  }, []);
+
+  // Calculate equipped items derived from user cosmetics
+  const equippedItems = useMemo(() => {
+    if (!user || !user.cosmetics) return [];
+    
+    // Enrich cosmetics with shop_item data if missing (though usually user.cosmetics has it joined or we map it)
+    return user.cosmetics.filter(c => c.equipped).map(c => {
+      // Ensure shop_items is present. If it was a simple join, it might be there.
+      // If not, we try to find it in shopItems state.
+      if (c.shop_items) return c;
+      const foundItem = shopItems.find(si => si.id === c.shop_item_id);
+      return { ...c, shop_items: foundItem || ({} as ShopItem) };
+    });
+  }, [user, shopItems]);
+
+  // Calculate total stats from equipped items
+  const totalStats = useMemo(() => {
+    const stats: Record<string, number> = {};
+    
+    equippedItems.forEach(item => {
+      const shopItem = item.shop_items;
+      if (!shopItem) return;
+
+      // Handle 'bonuses' array
+      if (shopItem.bonuses && Array.isArray(shopItem.bonuses)) {
+        shopItem.bonuses.forEach((bonus: any) => {
+           // Normalize keys if needed? The types seem to be 'str', 'spd' etc.
+           stats[bonus.type] = (stats[bonus.type] || 0) + bonus.value;
+        });
+      }
+      
+      // Handle legacy 'bonus_type' and 'bonus_value'
+      if (shopItem.bonus_type && shopItem.bonus_value) {
+        stats[shopItem.bonus_type] = (stats[shopItem.bonus_type] || 0) + shopItem.bonus_value;
+      }
+    });
+    
+    return stats;
+  }, [equippedItems]);
+
+  const refreshGameData = useCallback(async () => {
+    setLoading(true);
+    await Promise.all([loadGameData(), fetchShopItems()]);
+    // Optionally refresh user data too via useAuth's mechanism if available, 
+    // but useAuth handles its own state usually.
+    setLoading(false);
+  }, [loadGameData, fetchShopItems]);
+
+  // Initial load
+  useEffect(() => {
+    refreshGameData();
+  }, [refreshGameData]);
 
   // Save game data to AsyncStorage whenever it changes
   useEffect(() => {
@@ -48,62 +118,36 @@ export const useGameData = () => {
         await AsyncStorage.setItem(GAME_DATA_KEY, JSON.stringify(gameData));
       } catch (error) {
         console.error('Failed to save game data:', error);
-        // Handle error appropriately, e.g., show an error message to the user
       }
     };
-
     saveGameData();
   }, [gameData]);
 
-  // Load game data when the component mounts
-  useEffect(() => {
-    loadGameData();
-  }, [loadGameData]);
-
-  // Reload game data when the app comes into focus (e.g., after being in the background)
-  useFocusEffect(
-    useCallback(() => {
-      loadGameData();
-    }, [loadGameData])
-  );
-
-  // Handle app state changes (foreground/background)
+  // Handle app state changes
   useEffect(() => {
     const handleAppStateChange = (nextAppState: 'active' | 'background' | 'inactive') => {
       if (nextAppState === 'active') {
-        // Reload game data when the app becomes active
-        loadGameData();
+        refreshGameData();
       }
     };
-
     const subscription = AppState.addEventListener('change', handleAppStateChange);
-
     return () => {
-      subscription.remove(); // Clean up the event listener
+      subscription.remove();
     };
-  }, [loadGameData]);
+  }, [refreshGameData]);
 
-  // Function to update game data
   const updateGameData = (newData: Partial<GameData>) => {
     setGameData((prevData) => ({ ...prevData, ...newData }));
   };
 
-  // Function to reset game data to default values
   const resetGameData = async () => {
     try {
       await AsyncStorage.removeItem(GAME_DATA_KEY);
       setGameData(defaultGameData);
     } catch (error) {
       console.error('Failed to reset game data:', error);
-      // Handle error appropriately
     }
   };
-
-  // Mock data for InventoryScreen compatibility
-  const shopItems: ShopItem[] = [];
-  const equippedItems: UserCosmetic[] = [];
-  const totalStats: any = {};
-  const refreshGameData = async () => { await loadGameData(); };
 
   return {
     gameData,

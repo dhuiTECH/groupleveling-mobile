@@ -38,8 +38,9 @@ export const ShopItemMedia = ({
   const isAnimated = item.is_animated && isValidConfig;
   const imageSrc = item.image_url;
 
-  // --- ANIMATED RENDER ---
-  if (isAnimated && animate) {
+  // --- SPRITESHEET RENDER (Animated or Static First Frame) ---
+  // If we want to animate, OR if it's a spritesheet and we don't have a specific thumbnail, use AnimatedEquip
+  if (isAnimated && (animate || !item.thumbnail_url)) {
     const frameWidth = Number(config.frameWidth);
     const frameHeight = Number(config.frameHeight);
     const totalFrames = Number(config.totalFrames || 1);
@@ -53,12 +54,14 @@ export const ShopItemMedia = ({
         totalFrames={totalFrames}
         fps={fps}
         style={style}
+        paused={!animate}
       />
     );
   }
 
   // --- STATIC RENDER ---
-  const finalImageSrc = item.thumbnail_url || imageSrc;
+  // If animate is true, we always prefer the full imageSrc over the thumbnail
+  const finalImageSrc = animate ? imageSrc : (item.thumbnail_url || imageSrc);
 
   return (
     <Image

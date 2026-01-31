@@ -8,6 +8,7 @@ interface AnimatedEquipProps {
   totalFrames: number;
   fps?: number;
   style?: any;
+  paused?: boolean;
 }
 
 export default function AnimatedEquip({
@@ -16,19 +17,23 @@ export default function AnimatedEquip({
   frameHeight,
   totalFrames,
   fps = 10,
-  style
+  style,
+  paused = false
 }: AnimatedEquipProps) {
   const [currentFrame, setCurrentFrame] = useState(0);
 
   useEffect(() => {
-    if (totalFrames <= 1) return;
+    if (totalFrames <= 1 || paused) {
+      setCurrentFrame(0);
+      return;
+    }
 
     const interval = setInterval(() => {
       setCurrentFrame((prev) => (prev + 1) % totalFrames);
     }, 1000 / fps);
 
     return () => clearInterval(interval);
-  }, [totalFrames, fps]);
+  }, [totalFrames, fps, paused]);
 
   return (
     <View style={[styles.container, style, { overflow: 'hidden' }]}>
