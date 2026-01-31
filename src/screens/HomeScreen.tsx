@@ -20,24 +20,29 @@ import { useAuth } from '../contexts/AuthContext';
 import { Settings } from 'lucide-react-native';
 import { playHunterSound } from '../utils/audio';
 
-// Components
+import { HunterHeader } from '../components/HunterHeader';
+import { StatusWindowModal } from '../components/modals/StatusWindowModal';
 import VitalitySection from '../components/VitalitySection';
 import TrainingWidget from '../components/TrainingWidget';
 import DungeonView from '../components/DungeonView';
-import { SettingsModal } from '../components/SettingsModal';
-// GameBottomNav is now handled by AppNavigator
+
+import { TrainingLogModal } from '../components/modals/TrainingLogModal';
 
 const HomeScreen: React.FC = () => {
   const navigation = useNavigation<any>();
-  const insets = useSafeAreaInsets();
-  const { user, setUser, logout } = useAuth();
+  const { user, setUser } = useAuth();
   const [refreshing, setRefreshing] = useState(false);
-  const [settingsVisible, setSettingsVisible] = useState(false);
+  const [showStatusWindow, setShowStatusWindow] = useState(false);
+  const [isTrainingLogVisible, setIsTrainingLogVisible] = useState(false);
+  const [initialTrainingTab, setInitialTrainingTab] = useState<'training' | 'dietary'>('training');
 
-  // Enforce Class Selection if logged in but no class
+  const handleOpenTrainingLog = (tab: 'training' | 'dietary') => {
+    setInitialTrainingTab(tab);
+    setIsTrainingLogVisible(true);
+  };
+
   useEffect(() => {
     if (user && !user.current_class) {
-      // Small delay to ensure navigation is ready
       const timer = setTimeout(() => {
         navigation.navigate('ClassSelection');
       }, 500);
@@ -55,20 +60,11 @@ const HomeScreen: React.FC = () => {
 
   if (!user) {
     return (
-      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
         <ActivityIndicator size="large" color="#00ffff" />
       </View>
     );
   }
-
-  // Use user data from context or fallbacks
-  const displayUser = {
-    ...user,
-    profilePicture: user.profilePicture || require('../../assets/sungjinwoo.png'), // Fallback if not set
-    coins: user.coins || 0,
-    gems: user.gems || 0,
-    level: user.level || 1,
-  };
 
   return (
     <View style={styles.container}>
@@ -76,51 +72,26 @@ const HomeScreen: React.FC = () => {
         colors={['#020617', '#0f172a', '#020617']}
         style={styles.gradientBg}
       />
-      
       <SafeAreaView style={{ flex: 1 }}>
-        {/* Header Section */}
-        <View style={[styles.header, { marginTop: Platform.OS === 'android' ? 25 : 0 }]}>
-          <View style={styles.headerLeft}>
-            <Image source={user.profilePicture} style={styles.profilePic} />
-            <View>
-              <Text style={styles.userName}>{user.name}</Text>
-              <Text style={styles.userLevel}>Lv.{user.level}</Text>
-            </View>
-          </View>
-          
-          <View style={styles.headerRight}>
-            <View style={styles.currencyItem}>
-              <Image source={require('../../assets/expcrystal.png')} style={styles.currencyIcon} />
-            </View>
-            <View style={styles.currencyItem}>
-              <Image source={require('../../assets/gemicon.png')} style={styles.currencyIcon} />
-              <Text style={styles.currencyValue}>{user.gems}</Text>
-            </View>
-            <View style={styles.currencyItem}>
-              <View style={styles.coinContainer}>
-                <Image source={require('../../assets/coinicon.png')} style={styles.currencyIcon} />
-                <Text style={styles.currencyValue}>{user.coins.toLocaleString()}</Text>
-              </View>
-            </View>
-            <TouchableOpacity 
-              style={styles.settingsBtn} 
-              onPress={() => {
-                playHunterSound('click');
-                setSettingsVisible(true);
-              }}
-            >
-              <Settings size={20} color="#64748b" />
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        <SettingsModal
-          visible={settingsVisible}
-          onClose={() => setSettingsVisible(false)}
-          onLogout={logout}
-          onChat={() => navigation.navigate('Social')}
+        <HunterHeader 
+          user={user} 
+          setShowStatusWindow={setShowStatusWindow}
+          fastBoot={false}
+          setFastBoot={() => {}}
+          showNotification={() => {}}
+          toggleIncognito={() => {}}
         />
-
+        <StatusWindowModal 
+          visible={showStatusWindow} 
+          onClose={() => setShowStatusWindow(false)} 
+          user={user} 
+        />
+        <TrainingLogModal 
+          isOpen={isTrainingLogVisible} 
+          onClose={() => setIsTrainingLogVisible(false)} 
+          user={user} 
+          initialTab={initialTrainingTab}
+        />
         <ScrollView
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
@@ -140,13 +111,13 @@ const HomeScreen: React.FC = () => {
             user={user}
             trainingProtocol={{}}
             nutritionLogs={[]}
-            onOpenModal={() => {}}
+            onOpenModal={handleOpenTrainingLog}
             onClaimChest={() => {}}
             onClaimStepsReward={() => {}}
           />
 
           {/* Special Instances */}
-          <DungeonView 
+          <DungeonView
             user={user}
             dungeons={[]}
             activeTab="dashboard"
@@ -191,16 +162,14 @@ const HomeScreen: React.FC = () => {
           </View>
 
           <View style={{ height: 100 }} />
+          
+          {/* ... rest of the screen */}
         </ScrollView>
       </SafeAreaView>
-
-      {/* 
-        Bottom Navigation is now handled by the parent Tab Navigator.
-        We do NOT render GameBottomNav here directly.
-      */}
     </View>
   );
 };
+
 
 const styles = StyleSheet.create({
   container: {

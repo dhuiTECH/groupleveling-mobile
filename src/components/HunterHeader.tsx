@@ -18,12 +18,12 @@ import { XIcon } from './icons/XIcon';
 import { SkullIcon } from './icons/SkullIcon';
 import { GlobalTerminal } from './GlobalTerminal';
 import { BlurView } from 'expo-blur';
+import { AvatarViewerModal } from './modals/AvatarViewerModal';
 
 const { width, height } = Dimensions.get('window');
 
 interface HunterHeaderProps {
   user: User;
-  onAvatarClick: () => void;
   setShowStatusWindow: (show: boolean) => void;
   fastBoot: boolean;
   setFastBoot: (fast: boolean) => void;
@@ -33,7 +33,6 @@ interface HunterHeaderProps {
 
 export const HunterHeader: React.FC<HunterHeaderProps> = ({ 
   user,
-  onAvatarClick,
   setShowStatusWindow,
   fastBoot,
   setFastBoot,
@@ -42,6 +41,7 @@ export const HunterHeader: React.FC<HunterHeaderProps> = ({
 }) => {
   const insets = useSafeAreaInsets();
   const [showSettings, setShowSettings] = useState(false);
+  const [showAvatarViewer, setShowAvatarViewer] = useState(false);
 
   return (
     <View style={styles.header}>
@@ -49,11 +49,11 @@ export const HunterHeader: React.FC<HunterHeaderProps> = ({
       {/* LEFT SIDE - Identity */}
       <TouchableOpacity 
         style={styles.headerLeft} 
-        onPress={onAvatarClick}
+        onPress={() => setShowAvatarViewer(true)}
         activeOpacity={0.8}
       >
         <View style={styles.avatarContainer}>
-          <LayeredAvatar user={user} size={36} onAvatarClick={onAvatarClick} />
+          <LayeredAvatar user={user} size={36} />
         </View>
         <View style={styles.userInfo}>
           <Text style={styles.userName}>{user.name || 'Hunter'}</Text>
@@ -103,6 +103,11 @@ export const HunterHeader: React.FC<HunterHeaderProps> = ({
         toggleIncognito={toggleIncognito}
       />
 
+      <AvatarViewerModal
+        visible={showAvatarViewer}
+        onClose={() => setShowAvatarViewer(false)}
+        user={user}
+      />
     </View>
   );
 };

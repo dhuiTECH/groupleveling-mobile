@@ -7,7 +7,7 @@ interface TrainingWidgetProps {
   user: any;
   trainingProtocol: any;
   nutritionLogs: any[];
-  onOpenModal: () => void;
+  onOpenModal: (tab: 'training' | 'dietary') => void;
   onClaimChest: () => void;
   onClaimStepsReward: () => void;
 }
@@ -18,8 +18,9 @@ const TrainingWidget: React.FC<TrainingWidgetProps> = ({
   onClaimChest, 
   onClaimStepsReward 
 }) => {
+  const [activeTab, setActiveTab] = useState<'training' | 'dietary'>('training');
   const days = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
-  const currentDay = days[new Date().getDay() === 0 ? 6 : new Date().getDay() - 1]; // Map JS getDay (Sun=0) to MON-SUN
+  const currentDay = days[new Date().getDay() === 0 ? 6 : new Date().getDay() - 1];
 
   const [nutritionTotals, setNutritionTotals] = useState({
     protein: 0,
@@ -63,36 +64,45 @@ const TrainingWidget: React.FC<TrainingWidgetProps> = ({
       >
         {/* Tabs */}
         <View style={styles.tabs}>
-          <TouchableOpacity style={styles.activeTab}>
-            <Text style={styles.activeTabText}>[ TRAINING ]</Text>
-            <View style={styles.activeTabIndicator} />
+          <TouchableOpacity 
+            style={activeTab === 'training' ? styles.activeTab : styles.tab}
+            onPress={() => setActiveTab('training')}
+          >
+            <Text style={activeTab === 'training' ? styles.activeTabText : styles.tabText}>[ TRAINING ]</Text>
+            {activeTab === 'training' && <View style={styles.activeTabIndicator} />}
           </TouchableOpacity>
-          <TouchableOpacity style={styles.tab}>
-            <Text style={styles.tabText}>[ DIETARY ]</Text>
+          <TouchableOpacity 
+            style={activeTab === 'dietary' ? styles.activeTab : styles.tab}
+            onPress={() => setActiveTab('dietary')}
+          >
+            <Text style={activeTab === 'dietary' ? styles.activeTabText : styles.tabText}>[ DIETARY ]</Text>
+            {activeTab === 'dietary' && <View style={styles.activeTabIndicator} />}
           </TouchableOpacity>
         </View>
 
         {/* Days of Week */}
-        <View style={styles.daysContainer}>
-          {days.map((day) => {
-            const isActive = day === currentDay;
-            const isCompleted = false; // TODO: Connect to training protocol status
-            return (
-              <View key={day} style={styles.dayItem}>
-                <Text style={[styles.dayText, isActive && styles.activeDayText]}>{day}</Text>
-                <View style={[
-                  styles.dayCheck, 
-                  isCompleted ? styles.checkedDay : styles.uncheckedDay,
-                  isActive && styles.activeDayCheck
-                ]}>
-                  {isCompleted && (
-                    <Text style={styles.checkIcon}>✓</Text>
-                  )}
+        <TouchableOpacity onPress={() => onOpenModal(activeTab)}>
+          <View style={styles.daysContainer}>
+            {days.map((day) => {
+              const isActive = day === currentDay;
+              const isCompleted = false; // TODO: Connect to training protocol status
+              return (
+                <View key={day} style={styles.dayItem}>
+                  <Text style={[styles.dayText, isActive && styles.activeDayText]}>{day}</Text>
+                  <View style={[
+                    styles.dayCheck, 
+                    isCompleted ? styles.checkedDay : styles.uncheckedDay,
+                    isActive && styles.activeDayCheck
+                  ]}>
+                    {isCompleted && (
+                      <Text style={styles.checkIcon}>✓</Text>
+                    )}
+                  </View>
                 </View>
-              </View>
-            );
-          })}
-        </View>
+              );
+            })}
+          </View>
+        </TouchableOpacity>
 
         {/* Stats and Streak */}
         <View style={styles.bottomSection}>
@@ -115,7 +125,10 @@ const TrainingWidget: React.FC<TrainingWidgetProps> = ({
             </View>
           </View>
 
-          <TouchableOpacity style={styles.streakCard} onPress={onClaimChest}>
+          <TouchableOpacity 
+            style={styles.streakCard} 
+            onPress={user?.weekly_streak_count >= 7 ? onClaimChest : () => onOpenModal(activeTab)}
+          >
             <View>
               <Text style={styles.streakLabel}>WEEKLY STREAK: {user?.weekly_streak_count || 0}/7</Text>
             </View>

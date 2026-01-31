@@ -21,8 +21,8 @@ const DungeonView: React.FC<DungeonViewProps> = (props) => {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Image source={require('../../assets/exclamation.png')} style={styles.skullIcon} />
-        <Text style={styles.headerTitle}>SPECIAL_INSTANCES</Text>
+        <Image source={require('../../assets/special instances.png')} style={styles.skullIcon} />
+        <Text style={styles.headerTitle}>SPECIAL INSTANCES</Text>
       </View>
 
       <TouchableOpacity 
@@ -31,7 +31,7 @@ const DungeonView: React.FC<DungeonViewProps> = (props) => {
         activeOpacity={0.9}
       >
         <ImageBackground 
-          source={require('../../assets/gates.png')} 
+          source={require('../../assets/special instances.png')} 
           style={styles.backgroundImage}
           imageStyle={{ borderRadius: 8 }}
         >
@@ -94,7 +94,6 @@ const styles = StyleSheet.create({
   skullIcon: {
     width: 24,
     height: 24,
-    tintColor: '#ef4444',
   },
   headerTitle: {
     fontSize: 10,
