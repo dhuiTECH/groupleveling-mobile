@@ -4,6 +4,7 @@ import { useNavigation } from '@react-navigation/native';
 import type { RootStackScreenProps } from '../types/navigation';
 import * as Haptics from 'expo-haptics';
 import { useAuth } from '../contexts/AuthContext';
+import { supabase } from '../lib/supabase';
 import { playHunterSound } from '../utils/audio';
 
 // Import UI components
@@ -11,7 +12,7 @@ import OnboardingView from '../components/views/OnboardingView';
 
 export default function SignupScreen() {
   const navigation = useNavigation<RootStackScreenProps<'Signup'>['navigation']>();
-  const { signInWithOtp, verifyOtp, checkProfileExists } = useAuth();
+  const { signInWithOtp, verifyOtp, checkProfileExists, user, setUser } = useAuth();
   
   // Track email for verification step
   const emailRef = React.useRef('');
@@ -42,13 +43,32 @@ export default function SignupScreen() {
     }
   };
 
-  const handleVerifyOTP = async (otp: string) => {
+  const handleVerifyOTP = async (otp: string, data: { name: string, email: string, gender: string }) => {
     try {
       if (!emailRef.current) {
         return { success: false, error: 'Email context lost. Please try again.' };
       }
       
       await verifyOtp(emailRef.current, otp);
+      
+      // Upsert partial profile immediately after login
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+          let avatarUrl = '/NoobMan.png';
+          if (data.gender === 'Female') avatarUrl = '/NoobWoman.png';
+          else if (data.gender === 'Non-binary') avatarUrl = '/Noobnonbinary.png';
+
+          await supabase.from('profiles').upsert({
+            id: session.user.id,
+            hunter_name: data.name,
+            email: data.email,
+            gender: data.gender || 'Male',
+            avatar: avatarUrl,
+            onboarding_completed: false, // Not yet completed
+            updated_at: new Date().toISOString(),
+          });
+      }
+
       playHunterSound('loginSuccess');
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       return { success: true };
@@ -58,8 +78,46 @@ export default function SignupScreen() {
     }
   };
 
-  const handleClassAwaken = async (selectedClass: string) => {
+  const handleClassAwaken = async (data: { name: string, email: string, gender: string, selectedClass: string }) => {
     try {
+      const userId = (await supabase.auth.getSession()).data.session?.user.id;
+      if (!userId) throw new Error('User session not found');
+
+      let avatarUrl = '/NoobMan.png';
+      if (data.gender === 'Female') avatarUrl = '/NoobWoman.png';
+      else if (data.gender === 'Non-binary') avatarUrl = '/Noobnonbinary.png';
+
+      const updates = {
+          id: userId,
+          hunter_name: data.name,
+          email: data.email,
+          current_class: data.selectedClass,
+          gender: data.gender || 'Male',
+          avatar: avatarUrl,
+          level: 1,
+          coins: 100,
+          onboarding_completed: true,
+          updated_at: new Date().toISOString(),
+      };
+
+      const { error } = await supabase
+          .from('profiles')
+          .upsert(updates);
+
+      if (error) throw error;
+
+      // Update local user context
+      if (user) {
+        setUser({
+          ...user,
+          name: data.name,
+          current_class: data.selectedClass,
+          gender: data.gender,
+          onboarding_completed: true,
+          profilePicture: { uri: avatarUrl } // Optimistic update
+        });
+      }
+
       // Finalize awakening logic
       playHunterSound('levelUp');
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -70,6 +128,7 @@ export default function SignupScreen() {
       });
       return { success: true };
     } catch (e: any) {
+      console.error('Awakening error:', e);
       return { success: false, error: e.message || 'Failed to finalize awakening.' };
     }
   };

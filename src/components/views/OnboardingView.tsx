@@ -112,8 +112,8 @@ interface OnboardingProps {
   onAdminLogin: () => void;
   onComplete: (data: any) => void;
   handleAwaken: (data: any) => Promise<any>;
-  handleVerifyOTP: (otp: string) => Promise<any>;
-  handleClassAwaken: (selectedClass: string) => Promise<any>;
+  handleVerifyOTP: (otp: string, data: any) => Promise<any>;
+  handleClassAwaken: (data: any) => Promise<any>;
 }
 
 export default function OnboardingView({
@@ -158,7 +158,7 @@ export default function OnboardingView({
     if (otp.length !== 6) return;
     setIsLoading(true);
     try {
-      const res = await handleVerifyOTP(otp);
+      const res = await handleVerifyOTP(otp, data);
       if (res.success) setStep('class_path');
       else setError(res.error || 'Invalid Key');
     } catch (e) { setError('Verification Failed'); }
@@ -169,7 +169,11 @@ export default function OnboardingView({
     if (!selectedClass) return;
     setIsLoading(true);
     try {
-      const res = await handleClassAwaken(selectedClass);
+      // Pass full data including name, gender, and selected class
+      const res = await handleClassAwaken({
+        ...data,
+        selectedClass
+      });
       if (res.success) onComplete({ ...data, selectedClass });
       else setError(res.error || 'Class Sync Failed');
     } catch (e) { setError('Sync Error'); }
@@ -208,10 +212,9 @@ export default function OnboardingView({
       
       <Video
         source={require('../../../assets/Hologram.mp4')}
-        style={StyleSheet.absoluteFill}
+        style={[StyleSheet.absoluteFill, { opacity: 0.3 }]}
         resizeMode={ResizeMode.COVER}
         shouldPlay isLooping isMuted
-        opacity={0.3}
       />
       <View style={styles.bgOverlay} />
 
@@ -405,7 +408,7 @@ export default function OnboardingView({
                           >
                             <Image source={c.image} style={styles.classImg} />
                             <LinearGradient 
-                              colors={isSelected ? c.color : ['rgba(0,0,0,0.8)', 'rgba(0,0,0,0.4)']} 
+                              colors={isSelected ? (c.color as any) : ['rgba(0,0,0,0.8)', 'rgba(0,0,0,0.4)']} 
                               style={StyleSheet.absoluteFill} 
                             />
                             
@@ -603,4 +606,5 @@ const styles = StyleSheet.create({
     paddingVertical: 10, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8 
   },
   confirmClassText: { color: '#fff', fontSize: 10, fontWeight: '900', letterSpacing: 2 },
+  
 });

@@ -6,9 +6,9 @@ import * as Haptics from 'expo-haptics';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { LinearGradient } from 'expo-linear-gradient';
-import { MotiView, AnimatePresence } from 'moti'; // Using Moti for the smooth flex transition
+import { MotiView } from 'moti'; 
 
-// Assets
+// --- ASSET IMPORTS ---
 const classImages = {
   Assassin: require('../../assets/classes/assassin.webp'),
   Fighter: require('../../assets/classes/fighter.webp'),
@@ -18,28 +18,111 @@ const classImages = {
   Healer: require('../../assets/classes/healer.webp'),
 };
 
+const classIcons = {
+  Assassin: require('../../assets/classes/assassinicon.webp'),
+  Fighter: require('../../assets/classes/fightericon.webp'),
+  Tanker: require('../../assets/classes/tankericon.webp'),
+  Ranger: require('../../assets/classes/rangericon.webp'),
+  Mage: require('../../assets/classes/mageicon.webp'),
+  Healer: require('../../assets/classes/healericon.webp'),
+};
+
 const CLASSES = [
-  { id: 'Assassin', name: 'ASSASSIN', subtitle: 'VELOCITY & PRECISION', desc: 'Precision & Speed. Silent execution.', image: classImages.Assassin, color: ['#9333ea', '#000000'], stats: { agility: 95, strength: 55, vitality: 50 }, icon: '🗡️' },
-  { id: 'Fighter', name: 'FIGHTER', subtitle: 'INTENSITY & STRENGTH', desc: 'Intensity & Strength. Peak power.', image: classImages.Fighter, color: ['#dc2626', '#000000'], stats: { agility: 55, strength: 95, vitality: 70 }, icon: '⚔️' },
-  { id: 'Tanker', name: 'TANKER', subtitle: 'STAMINA & ENDURANCE', desc: 'Unyielding Defense. Ultimate shield.', image: classImages.Tanker, color: ['#2563eb', '#000000'], stats: { agility: 40, strength: 75, vitality: 95 }, icon: '🛡️' },
-  { id: 'Ranger', name: 'RANGER', subtitle: 'PERCEPTION & FOCUS', desc: 'Perception & Range. Survival master.', image: classImages.Ranger, color: ['#ea580c', '#000000'], stats: { agility: 80, strength: 60, vitality: 60 }, icon: '🏹' },
-  { id: 'Mage', name: 'MAGE', subtitle: 'TECHNICAL & CORE', desc: 'Intellect & Power. Arcane control.', image: classImages.Mage, color: ['#4f46e5', '#000000'], stats: { agility: 60, strength: 40, vitality: 50 }, icon: '🔮' },
-  { id: 'Healer', name: 'HEALER', subtitle: 'RECOVERY & CONSISTENCY', desc: 'Spirit & Support. Life preservation.', image: classImages.Healer, color: ['#16a34a', '#000000'], stats: { agility: 50, strength: 45, vitality: 85 }, icon: '✨' },
+  { 
+    id: 'Assassin', 
+    name: 'ASSASSIN', 
+    subtitle: 'VELOCITY & PRECISION', 
+    desc: 'Precision & Speed. Silent execution.', 
+    image: classImages.Assassin, 
+    icon: classIcons.Assassin, 
+    stats: { agility: 95, strength: 55, vitality: 50 } 
+  },
+  { 
+    id: 'Fighter', 
+    name: 'FIGHTER', 
+    subtitle: 'INTENSITY & STRENGTH', 
+    desc: 'Intensity & Strength. Peak power.', 
+    image: classImages.Fighter, 
+    icon: classIcons.Fighter, 
+    stats: { agility: 55, strength: 95, vitality: 70 } 
+  },
+  { 
+    id: 'Tanker', 
+    name: 'TANKER', 
+    subtitle: 'STAMINA & ENDURANCE', 
+    desc: 'Unyielding Defense. Ultimate shield.', 
+    image: classImages.Tanker, 
+    icon: classIcons.Tanker, 
+    stats: { agility: 40, strength: 75, vitality: 95 } 
+  },
+  { 
+    id: 'Ranger', 
+    name: 'RANGER', 
+    subtitle: 'PERCEPTION & FOCUS', 
+    desc: 'Perception & Range. Survival master.', 
+    image: classImages.Ranger, 
+    icon: classIcons.Ranger, 
+    stats: { agility: 80, strength: 60, vitality: 60 } 
+  },
+  { 
+    id: 'Mage', 
+    name: 'MAGE', 
+    subtitle: 'TECHNICAL & CORE', 
+    desc: 'Intellect & Power. Arcane control.', 
+    image: classImages.Mage, 
+    icon: classIcons.Mage, 
+    stats: { agility: 60, strength: 40, vitality: 50 } 
+  },
+  { 
+    id: 'Healer', 
+    name: 'HEALER', 
+    subtitle: 'RECOVERY & CONSISTENCY', 
+    desc: 'Spirit & Support. Life preservation.', 
+    image: classImages.Healer, 
+    icon: classIcons.Healer, 
+    stats: { agility: 50, strength: 45, vitality: 85 } 
+  },
 ];
 
-export const ClassSelectionScreen: React.FC = () => {
+const ClassSelectionScreen = () => {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const insets = useSafeAreaInsets();
-  const { user } = useAuth();
-  const [selectedClass, setSelectedClass] = useState<string>('Fighter'); // Default selection matches Next.js
+  const { user, setUser } = useAuth();
+  const [selectedClass, setSelectedClass] = useState<string>('Fighter'); 
   const [loading, setLoading] = useState(false);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
 
-  // Params passed from SignupScreen
   const { gender, name } = route.params || {};
 
   useEffect(() => {
+    const fetchProfile = async () => {
+        if (!user) return;
+        try {
+            const { data, error } = await supabase
+                .from('profiles')
+                .select('*')
+                .eq('id', user.id)
+                .single();
+            
+            if (data) {
+                // If local user context is missing name/gender (e.g. stale), update it or just use it here
+                if (setUser && (!user.name || user.name === 'User' || !user.gender)) {
+                    setUser({
+                        ...user,
+                        name: data.hunter_name || user.name,
+                        gender: data.gender || user.gender,
+                        onboarding_completed: data.onboarding_completed
+                    });
+                }
+            }
+        } catch (e) {
+            console.log('Error fetching profile in ClassSelection:', e);
+        }
+    };
+
+    fetchProfile();
+
     if (user) {
       setIsCheckingAuth(false);
     } else {
@@ -87,8 +170,24 @@ export const ClassSelectionScreen: React.FC = () => {
 
         if (error) throw error;
 
+        // Update local user state to trigger navigation change
+        if (user) {
+            setUser({
+                ...user,
+                current_class: selectedClass,
+                onboarding_completed: true,
+                gender: gender || user.gender || 'Male',
+                name: name || user.name || 'Hunter',
+                profilePicture: { uri: avatarUrl }
+            });
+        }
+
         Alert.alert('System Message', 'Class Awakening Complete.', [
-            { text: 'ENTER', onPress: () => navigation.reset({ index: 0, routes: [{ name: 'Home' }] }) }
+            { text: 'ENTER', onPress: () => {
+                // No explicit navigation reset needed if AppNavigator handles state
+                // But for safety/animation:
+                // navigation.reset({ index: 0, routes: [{ name: 'Home' }] }) 
+            }}
         ]);
 
     } catch (error: any) {
@@ -111,9 +210,8 @@ export const ClassSelectionScreen: React.FC = () => {
     <View style={styles.container}>
       <LinearGradient colors={['#0f172a', '#020617']} style={StyleSheet.absoluteFill} />
       
-      {/* Grid Overlay Effect */}
       <Image 
-        source={{ uri: 'https://grainy-gradients.vercel.app/noise.svg' }} // Optional: Use local asset if preferred
+        source={{ uri: 'https://grainy-gradients.vercel.app/noise.svg' }}
         style={[StyleSheet.absoluteFill, { opacity: 0.05 }]}
       />
 
@@ -138,7 +236,7 @@ export const ClassSelectionScreen: React.FC = () => {
             <Text style={styles.subTitle}>SELECT YOUR COMBAT ARCHETYPE</Text>
         </View>
 
-        {/* --- VERTICAL WINDOW PANE LOGIC --- */}
+        {/* --- VERTICAL PANE LAYOUT --- */}
         <View style={styles.paneContainer}>
             {CLASSES.map((cls) => {
                 const isSelected = selectedClass === cls.id;
@@ -146,7 +244,6 @@ export const ClassSelectionScreen: React.FC = () => {
                 return (
                     <MotiView
                         key={cls.id}
-                        // This animates the flex value (width) just like Next.js layoutId
                         animate={{ flex: isSelected ? 5 : 1 }}
                         transition={{ type: 'timing', duration: 400 }}
                         style={[
@@ -160,8 +257,15 @@ export const ClassSelectionScreen: React.FC = () => {
                             activeOpacity={0.9}
                         >
                             <Image source={cls.image} style={styles.paneImage} />
+                            
+                            {/* Updated Gradient: Cleaner fade to show character */}
                             <LinearGradient
-                                colors={isSelected ? ['transparent', 'rgba(0,0,0,0.9)'] : ['rgba(0,0,0,0.6)', 'rgba(0,0,0,0.8)']}
+                                colors={
+                                  isSelected 
+                                    ? ['transparent', 'transparent', 'rgba(0,0,0,0.8)', '#000'] // Extra transparent steps for visibility
+                                    : ['rgba(0,0,0,0.6)', 'rgba(0,0,0,0.8)']
+                                }
+                                locations={isSelected ? [0, 0.5, 0.8, 1] : [0, 1]}
                                 style={StyleSheet.absoluteFill}
                             />
 
@@ -181,8 +285,9 @@ export const ClassSelectionScreen: React.FC = () => {
                                     style={styles.selectedContent}
                                 >
                                     <View style={styles.iconBadge}>
-                                        <Text style={{ fontSize: 20 }}>{cls.icon}</Text>
+                                        <Image source={cls.icon} style={styles.iconImage} resizeMode="contain" />
                                     </View>
+
                                     <Text style={styles.selectedTitle}>{cls.name}</Text>
                                     <Text style={styles.selectedSubtitle}>{cls.subtitle}</Text>
                                     <Text style={styles.selectedDesc}>{cls.desc}</Text>
@@ -257,10 +362,10 @@ const styles = StyleSheet.create({
   // --- VERTICAL PANE LAYOUT ---
   paneContainer: {
     flex: 1,
-    flexDirection: 'row', // Horizontal Layout
+    flexDirection: 'row', 
     paddingHorizontal: 8,
     gap: 4,
-    marginBottom: 80, // Space for footer
+    marginBottom: 80, 
   },
   pane: {
     height: '100%',
@@ -269,14 +374,18 @@ const styles = StyleSheet.create({
     position: 'relative',
     borderWidth: 1,
   },
+  
+  // 👇 UPDATED: WHITE GLOW STYLES
   paneSelected: {
-    borderColor: '#22d3ee',
+    borderColor: '#ffffff', // White Border
+    borderWidth: 2,         // Thicker to make it pop
     zIndex: 10,
-    shadowColor: '#22d3ee',
-    shadowOpacity: 0.3,
+    shadowColor: '#ffffff', // White Glow
+    shadowOpacity: 0.8,
     shadowRadius: 15,
-    elevation: 10,
+    elevation: 20,
   },
+  
   paneUnselected: {
     borderColor: 'rgba(255,255,255,0.1)',
   },
@@ -287,7 +396,6 @@ const styles = StyleSheet.create({
     resizeMode: 'cover',
   },
 
-  // Vertical Text Logic
   verticalTitleContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -298,13 +406,11 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: '900',
     letterSpacing: 4,
-    // Rotate text -90 degrees
     transform: [{ rotate: '-90deg' }],
-    width: 400, // Ensure width doesn't wrap when rotated
+    width: 400,
     textAlign: 'center',
   },
 
-  // Selected Content Logic
   selectedContent: {
     flex: 1,
     justifyContent: 'flex-end',
@@ -312,15 +418,17 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
   },
   iconBadge: {
-    width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'center', alignItems: 'center', marginBottom: 10,
-    borderWidth: 1, borderColor: '#22d3ee'
+    justifyContent: 'center', alignItems: 'center', 
+    marginBottom: 10,
   },
-  selectedTitle: { fontSize: 32, fontWeight: '900', color: '#fff', letterSpacing: 1 },
+  iconImage: {
+    width: 60, height: 60,
+  },
+
+  selectedTitle: { fontSize: 22, fontWeight: '900', color: '#fff', letterSpacing: 1 },
   selectedSubtitle: { fontSize: 10, color: '#06b6d4', fontWeight: 'bold', letterSpacing: 2, marginBottom: 8 },
   selectedDesc: { fontSize: 12, color: '#cbd5e1', lineHeight: 16, marginBottom: 20 },
 
-  // Stats
   statsContainer: { gap: 8 },
   statRow: { gap: 4 },
   statLabelRow: { flexDirection: 'row', justifyContent: 'space-between' },
@@ -329,7 +437,6 @@ const styles = StyleSheet.create({
   statBarBg: { height: 3, backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 2, overflow: 'hidden' },
   statBarFill: { height: '100%', backgroundColor: '#06b6d4' },
 
-  // Footer
   footer: {
     position: 'absolute', bottom: 0, left: 0, right: 0,
     alignItems: 'center', justifyContent: 'center',
@@ -340,10 +447,12 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.8)',
     borderWidth: 1, borderColor: '#22d3ee',
     paddingVertical: 15,
-    borderRadius: 2, // Slight sharp tech look
+    borderRadius: 2, 
     alignItems: 'center',
   },
   confirmButtonDisabled: { opacity: 0.7 },
   confirmButtonText: { color: '#fff', fontSize: 14, fontWeight: '900', letterSpacing: 3 },
   btnInner: { flexDirection: 'row', alignItems: 'center' },
 });
+
+export default ClassSelectionScreen;

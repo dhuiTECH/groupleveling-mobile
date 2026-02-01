@@ -60,30 +60,38 @@ export function AppNavigator(): JSX.Element {
     >
       {user ? (
         // Authenticated Stack
-        <>
-          <Stack.Screen 
-            name="Home" 
-            component={BottomTabNavigator} 
-          />
+        !user.onboarding_completed ? (
           <Stack.Screen 
             name="ClassSelection" 
             component={ClassSelectionScreen}
           />
-          <Stack.Screen 
-            name="Dungeon" 
-            component={DungeonScreen}
-            options={{ title: 'Dungeon' }}
-          />
-          <Stack.Screen 
-            name="Dashboard" 
-            component={DashboardScreen}
-            options={{ title: 'Dashboard' }}
-          />
-          <Stack.Screen 
-            name="Admin" 
-            component={AdminScreen}
-          />
-        </>
+        ) : (
+          <>
+            <Stack.Screen 
+              name="Home" 
+              component={BottomTabNavigator} 
+            />
+            {/* ClassSelectionScreen can still be accessed if needed, e.g. for re-spec */}
+            <Stack.Screen 
+              name="ClassSelection" 
+              component={ClassSelectionScreen}
+            />
+            <Stack.Screen 
+              name="Dungeon" 
+              component={DungeonScreen}
+              options={{ title: 'Dungeon' }}
+            />
+            <Stack.Screen 
+              name="Dashboard" 
+              component={DashboardScreen}
+              options={{ title: 'Dashboard' }}
+            />
+            <Stack.Screen 
+              name="Admin" 
+              component={AdminScreen}
+            />
+          </>
+        )
       ) : (
         // Auth Stack
         <>
