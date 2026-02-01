@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Dimensions, RefreshControl } from 'react-native';
 import { RefreshCw, Crown, Loader2, ThumbsUp, ThumbsDown } from 'lucide-react-native';
 import { MotiView } from 'moti';
 import LayeredAvatar from '../LayeredAvatar';
@@ -16,6 +16,7 @@ interface ShowcasePanelProps {
   loadShowcaseHunters: () => void;
   handleShowcaseVote: (targetId: string, voteType: 'resonate' | 'interfere') => void;
   setSelectedAvatar: (user: any) => void;
+  onRefresh: () => void;
 }
 
 const ShowcasePanel: React.FC<ShowcasePanelProps> = ({
@@ -26,10 +27,21 @@ const ShowcasePanel: React.FC<ShowcasePanelProps> = ({
   isLoading,
   loadShowcaseHunters,
   handleShowcaseVote,
-  setSelectedAvatar
+  setSelectedAvatar,
+  onRefresh
 }) => {
   return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+    <ScrollView 
+      style={styles.container} 
+      showsVerticalScrollIndicator={false}
+      refreshControl={
+        <RefreshControl 
+          refreshing={isLoading} 
+          onRefresh={onRefresh} 
+          tintColor="#22d3ee"
+        />
+      }
+    >
       <View style={styles.header}>
         <Text style={styles.headerTitle}>STYLE_MONARCH_SHOWCASE</Text>
         <View style={styles.headerRight}>

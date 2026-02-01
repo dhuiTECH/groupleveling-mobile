@@ -161,8 +161,7 @@ export const api = {
           type: pathName,
           xp_earned: xp,
           coins_earned: coins,
-          claimed: true,
-          workout_type: 'Training Log'
+          claimed: true
         });
 
       if (activityError) {

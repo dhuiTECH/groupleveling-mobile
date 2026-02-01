@@ -21,9 +21,12 @@ import SocialHub from '../components/SocialHub';
 import { User } from '../types/user';
 import { PlayerCallingCard } from '../components/PlayerCallingCard';
 
+import { useNotification } from '../contexts/NotificationContext';
+
 export const SocialScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
+  const { showNotification } = useNotification();
   const socialData = useSocialData();
   const [selectedAvatar, setSelectedAvatar] = useState<User | null>(null);
   const [associationName, setAssociationName] = useState('');
@@ -32,10 +35,6 @@ export const SocialScreen: React.FC = () => {
   const onRefresh = useCallback(async () => {
     await socialData.refreshAllData();
   }, [socialData]);
-
-  const showNotification = (message: string, type: 'success' | 'error') => {
-    console.log(`[${type.toUpperCase()}] ${message}`);
-  };
 
   if (!user) return null;
 
@@ -51,19 +50,11 @@ export const SocialScreen: React.FC = () => {
         />
         
         <SafeAreaView style={{ flex: 1, paddingTop: Platform.OS === 'android' ? insets.top : 0 }}>
-          <ScrollView
-            contentContainerStyle={{ flexGrow: 1 }}
-            refreshControl={
-              <RefreshControl 
-                refreshing={socialData.isLoading} 
-                onRefresh={onRefresh} 
-                tintColor="#22d3ee"
-              />
-            }
-          >
+          <View style={{ flex: 1 }}>
             <SocialHub
               user={user}
               {...socialData}
+              onRefresh={onRefresh}
               associationName={associationName}
               setAssociationName={setAssociationName}
               selectedEmblem={selectedEmblem}
@@ -78,7 +69,7 @@ export const SocialScreen: React.FC = () => {
                 'https://wyatvubfobfshqyfobqy.supabase.co/storage/v1/object/public/emblems/skull.png',
               ]}
             />
-          </ScrollView>
+          </View>
         </SafeAreaView>
 
         {/* Player Detail Modal */}

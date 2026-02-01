@@ -28,6 +28,7 @@ interface SocialHubProps {
   suggestions?: any[];
   searchResults: any[];
   isSocialLoading: boolean;
+  onRefresh: () => void;
   loadLeaderboard: () => void;
   handleFriendSearch: (query: string) => void;
   handleAddFriend: (userId: string) => void;
@@ -64,6 +65,8 @@ const SocialHub: React.FC<SocialHubProps> = (props) => {
             leaderboard={props.leaderboard}
             loadLeaderboard={props.loadLeaderboard}
             setSelectedAvatar={props.setSelectedAvatar}
+            isSocialLoading={props.isSocialLoading}
+            onRefresh={props.onRefresh}
           />
         );
       case 'friends':
@@ -81,6 +84,8 @@ const SocialHub: React.FC<SocialHubProps> = (props) => {
             handleRejectFriendRequest={props.handleRejectFriendRequest}
             handleCancelOutgoingRequest={props.handleCancelOutgoingRequest}
             setSelectedAvatar={props.setSelectedAvatar}
+            isSocialLoading={props.isSocialLoading}
+            onRefresh={props.onRefresh}
           />
         );
       case 'association':
@@ -102,6 +107,8 @@ const SocialHub: React.FC<SocialHubProps> = (props) => {
             handleApplicantDecision={props.handleApplicantDecision}
             handleCreateAssociation={() => props.handleCreateAssociation(props.associationName, props.selectedEmblem)}
             setSelectedAvatar={props.setSelectedAvatar}
+            isSocialLoading={props.isSocialLoading}
+            onRefresh={props.onRefresh}
           />
         );
       case 'showcase':
@@ -115,6 +122,7 @@ const SocialHub: React.FC<SocialHubProps> = (props) => {
             loadShowcaseHunters={props.loadShowcaseHunters}
             handleShowcaseVote={props.handleShowcaseVote}
             setSelectedAvatar={props.setSelectedAvatar}
+            onRefresh={props.onRefresh}
           />
         );
       case 'arena':

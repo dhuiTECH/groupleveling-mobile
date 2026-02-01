@@ -8,6 +8,7 @@ import { SkullIcon } from '../icons/SkullIcon';
 import { GlobalTerminal } from '../GlobalTerminal';
 import { User } from '../../types/user';
 import BaseModal from './BaseModal';
+import { useNotification } from '../../contexts/NotificationContext';
 
 interface SettingsModalProps {
   visible: boolean;
@@ -15,8 +16,8 @@ interface SettingsModalProps {
   user: User;
   fastBoot: boolean;
   setFastBoot: (fast: boolean) => void;
-  showNotification: (msg: string) => void;
   toggleIncognito: () => void;
+  onLogout: () => void;
   // Add other props from HunterHeader as needed, e.g., for logout
 }
 
@@ -26,9 +27,10 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   user,
   fastBoot,
   setFastBoot,
-  showNotification,
   toggleIncognito,
+  onLogout,
 }) => {
+  const { showNotification } = useNotification();
   return (
     <BaseModal visible={visible} onClose={onClose}>
       <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
@@ -98,7 +100,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
             <TouchableOpacity
               style={[styles.settingOption, styles.logoutOption]}
               onPress={() => {
-                // Handle logout logic here or pass prop
+                onLogout();
                 onClose();
               }}
             >

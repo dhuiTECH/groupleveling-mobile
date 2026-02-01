@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, SafeAreaView, Image, Alert, ActivityIndicator, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, Image, Alert, ActivityIndicator, Dimensions, Platform } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
-import type { RootStackScreenProps } from '../types/navigation';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { LinearGradient } from 'expo-linear-gradient';
+import { MotiView, AnimatePresence } from 'moti'; // Using Moti for the smooth flex transition
 
 // Assets
 const classImages = {
@@ -18,37 +18,21 @@ const classImages = {
   Healer: require('../../assets/classes/healer.webp'),
 };
 
-interface ClassOption {
-  id: string;
-  name: string;
-  desc: string;
-  image: any;
-  color: string[];
-  stats: {
-    strength: number; // roughly mapped to agility/strength/vitality for display
-    agility: number;
-    vitality: number;
-  };
-  icon: string;
-}
-
-const CLASSES: ClassOption[] = [
-  { id: 'Assassin', name: 'Assassin', desc: 'Precision & Speed. Silent execution.', image: classImages.Assassin, color: ['#9333ea', '#000000'], stats: { agility: 95, strength: 55, vitality: 50 }, icon: '🗡️' },
-  { id: 'Fighter', name: 'Fighter', desc: 'Intensity & Strength. Peak power.', image: classImages.Fighter, color: ['#dc2626', '#000000'], stats: { agility: 55, strength: 95, vitality: 70 }, icon: '⚔️' },
-  { id: 'Tanker', name: 'Tanker', desc: 'Unyielding Defense. Ultimate shield.', image: classImages.Tanker, color: ['#2563eb', '#000000'], stats: { agility: 40, strength: 75, vitality: 95 }, icon: '🛡️' },
-  { id: 'Ranger', name: 'Ranger', desc: 'Perception & Range. Survival master.', image: classImages.Ranger, color: ['#ea580c', '#000000'], stats: { agility: 80, strength: 60, vitality: 60 }, icon: '🏹' },
-  { id: 'Mage', name: 'Mage', desc: 'Intellect & Power. Arcane control.', image: classImages.Mage, color: ['#4f46e5', '#000000'], stats: { agility: 60, strength: 40, vitality: 50 }, icon: '🔮' },
-  { id: 'Healer', name: 'Healer', desc: 'Spirit & Support. Life preservation.', image: classImages.Healer, color: ['#16a34a', '#000000'], stats: { agility: 50, strength: 45, vitality: 85 }, icon: '✨' },
+const CLASSES = [
+  { id: 'Assassin', name: 'ASSASSIN', subtitle: 'VELOCITY & PRECISION', desc: 'Precision & Speed. Silent execution.', image: classImages.Assassin, color: ['#9333ea', '#000000'], stats: { agility: 95, strength: 55, vitality: 50 }, icon: '🗡️' },
+  { id: 'Fighter', name: 'FIGHTER', subtitle: 'INTENSITY & STRENGTH', desc: 'Intensity & Strength. Peak power.', image: classImages.Fighter, color: ['#dc2626', '#000000'], stats: { agility: 55, strength: 95, vitality: 70 }, icon: '⚔️' },
+  { id: 'Tanker', name: 'TANKER', subtitle: 'STAMINA & ENDURANCE', desc: 'Unyielding Defense. Ultimate shield.', image: classImages.Tanker, color: ['#2563eb', '#000000'], stats: { agility: 40, strength: 75, vitality: 95 }, icon: '🛡️' },
+  { id: 'Ranger', name: 'RANGER', subtitle: 'PERCEPTION & FOCUS', desc: 'Perception & Range. Survival master.', image: classImages.Ranger, color: ['#ea580c', '#000000'], stats: { agility: 80, strength: 60, vitality: 60 }, icon: '🏹' },
+  { id: 'Mage', name: 'MAGE', subtitle: 'TECHNICAL & CORE', desc: 'Intellect & Power. Arcane control.', image: classImages.Mage, color: ['#4f46e5', '#000000'], stats: { agility: 60, strength: 40, vitality: 50 }, icon: '🔮' },
+  { id: 'Healer', name: 'HEALER', subtitle: 'RECOVERY & CONSISTENCY', desc: 'Spirit & Support. Life preservation.', image: classImages.Healer, color: ['#16a34a', '#000000'], stats: { agility: 50, strength: 45, vitality: 85 }, icon: '✨' },
 ];
 
-const { width } = Dimensions.get('window');
-
 export const ClassSelectionScreen: React.FC = () => {
-  const navigation = useNavigation<RootStackScreenProps<'ClassSelection'>['navigation']>();
+  const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const insets = useSafeAreaInsets();
-  const { user, setUser } = useAuth();
-  const [selectedClass, setSelectedClass] = useState<string | null>(null);
+  const { user } = useAuth();
+  const [selectedClass, setSelectedClass] = useState<string>('Fighter'); // Default selection matches Next.js
   const [loading, setLoading] = useState(false);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
 
@@ -56,13 +40,10 @@ export const ClassSelectionScreen: React.FC = () => {
   const { gender, name } = route.params || {};
 
   useEffect(() => {
-    // Wait for auth to settle if user is null (race condition with signup)
     if (user) {
       setIsCheckingAuth(false);
     } else {
-      const timer = setTimeout(() => {
-        setIsCheckingAuth(false);
-      }, 2000); // Give it 2s to sync
+      const timer = setTimeout(() => setIsCheckingAuth(false), 2000);
       return () => clearTimeout(timer);
     }
   }, [user]);
@@ -75,41 +56,26 @@ export const ClassSelectionScreen: React.FC = () => {
   const handleConfirm = async () => {
     if (!selectedClass) return;
     
-    // Check user again
-    if (!user) {
-        // Try to get session one last time
-        const { data } = await supabase.auth.getSession();
-        if (!data.session) {
-            Alert.alert('Authentication Error', 'Session not found. Please log in again.', [
-                { text: 'OK', onPress: () => navigation.navigate('Login') }
-            ]);
-            return;
-        }
-    }
-
-    // Use current user or session user
     const userId = user?.id || (await supabase.auth.getSession()).data.session?.user.id;
     if (!userId) {
-         Alert.alert('Error', 'Critical: No user ID found.');
-         return;
+       Alert.alert('Error', 'Critical: No user ID found.');
+       return;
     }
 
     setLoading(true);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
     try {
-        // Determine avatar based on gender
         let avatarUrl = '/NoobMan.png';
         if (gender === 'Female') avatarUrl = '/NoobWoman.png';
         else if (gender === 'Non-binary') avatarUrl = '/Noobnonbinary.png';
 
-        // Update profile in Supabase
         const { error } = await supabase
             .from('profiles')
             .upsert({
                 id: userId,
                 hunter_name: name || user?.name || 'Hunter', 
-                email: user?.email, // Might be undefined if user is null, but upsert merges
+                email: user?.email,
                 current_class: selectedClass,
                 gender: gender || 'Male',
                 avatar: avatarUrl,
@@ -126,8 +92,7 @@ export const ClassSelectionScreen: React.FC = () => {
         ]);
 
     } catch (error: any) {
-        console.error('Class selection error:', error);
-        Alert.alert('Error', 'Failed to finalize class selection: ' + error.message);
+        Alert.alert('Error', error.message);
     } finally {
         setLoading(false);
     }
@@ -135,276 +100,250 @@ export const ClassSelectionScreen: React.FC = () => {
 
   if (isCheckingAuth) {
       return (
-          <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+          <View style={[styles.container, styles.center]}>
               <ActivityIndicator size="large" color="#06b6d4" />
-              <Text style={{ color: '#06b6d4', marginTop: 20, fontWeight: 'bold' }}>SYNCHRONIZING SYSTEM...</Text>
-          </View>
-      );
-  }
-
-  // If still no user after waiting, show login prompt
-  if (!user) {
-      return (
-          <View style={[styles.container, { justifyContent: 'center', alignItems: 'center', padding: 20 }]}>
-              <Text style={{ color: '#fff', fontSize: 18, fontWeight: 'bold', textAlign: 'center', marginBottom: 20 }}>
-                  CONNECTION LOST
-              </Text>
-              <Text style={{ color: '#94a3b8', textAlign: 'center', marginBottom: 30 }}>
-                  Hunter signal not found. Please re-establish connection.
-              </Text>
-              <TouchableOpacity 
-                  style={styles.confirmButton} 
-                  onPress={() => navigation.navigate('Login')}
-              >
-                  <Text style={styles.confirmButtonText}>LOGIN SYSTEM</Text>
-              </TouchableOpacity>
+              <Text style={styles.loadingText}>SYNCHRONIZING SYSTEM...</Text>
           </View>
       );
   }
 
   return (
     <View style={styles.container}>
-      <LinearGradient
-        colors={['#0f172a', '#020617']}
-        style={styles.background}
-      />
+      <LinearGradient colors={['#0f172a', '#020617']} style={StyleSheet.absoluteFill} />
       
+      {/* Grid Overlay Effect */}
+      <Image 
+        source={{ uri: 'https://grainy-gradients.vercel.app/noise.svg' }} // Optional: Use local asset if preferred
+        style={[StyleSheet.absoluteFill, { opacity: 0.05 }]}
+      />
+
       <SafeAreaView style={[styles.safeArea, { paddingTop: insets.top }]}>
+        
+        {/* HUD Header */}
         <View style={styles.header}>
-            <Text style={styles.headerTitle}>CLASS AWAKENING</Text>
-            <Text style={styles.headerSubtitle}>CHOOSE YOUR PATH</Text>
+          <View>
+            <View style={styles.statusRow}>
+                <View style={styles.statusDot} />
+                <Text style={styles.statusText}>SYSTEM_STATUS: ONLINE</Text>
+            </View>
+            <Text style={styles.modeText}>MODE: SELECTION</Text>
+          </View>
+          <View style={{ alignItems: 'flex-end' }}>
+            <Text style={styles.modeText}>LOCAL_NODE: 04</Text>
+          </View>
         </View>
 
-        <ScrollView 
-            contentContainerStyle={styles.gridContainer}
-            showsVerticalScrollIndicator={false}
-        >
+        <View style={styles.titleContainer}>
+            <Text style={styles.mainTitle}>CLASS SELECTION</Text>
+            <Text style={styles.subTitle}>SELECT YOUR COMBAT ARCHETYPE</Text>
+        </View>
+
+        {/* --- VERTICAL WINDOW PANE LOGIC --- */}
+        <View style={styles.paneContainer}>
             {CLASSES.map((cls) => {
                 const isSelected = selectedClass === cls.id;
+                
                 return (
-                    <TouchableOpacity
+                    <MotiView
                         key={cls.id}
+                        // This animates the flex value (width) just like Next.js layoutId
+                        animate={{ flex: isSelected ? 5 : 1 }}
+                        transition={{ type: 'timing', duration: 400 }}
                         style={[
-                            styles.classCard,
-                            isSelected && styles.classCardSelected,
-                            { borderColor: isSelected ? '#06b6d4' : 'rgba(255,255,255,0.1)' }
+                            styles.pane,
+                            isSelected ? styles.paneSelected : styles.paneUnselected
                         ]}
-                        onPress={() => handleClassSelect(cls.id)}
-                        activeOpacity={0.9}
                     >
-                        <Image source={cls.image} style={styles.classImage} />
-                        <LinearGradient
-                            colors={['transparent', 'rgba(0,0,0,0.8)', '#000']}
-                            style={styles.gradientOverlay}
-                        />
-                        
-                        {/* Selected Indicator/Border Effect */}
-                        {isSelected && <View style={styles.selectedBorder} />}
+                        <TouchableOpacity 
+                            style={StyleSheet.absoluteFill} 
+                            onPress={() => handleClassSelect(cls.id)}
+                            activeOpacity={0.9}
+                        >
+                            <Image source={cls.image} style={styles.paneImage} />
+                            <LinearGradient
+                                colors={isSelected ? ['transparent', 'rgba(0,0,0,0.9)'] : ['rgba(0,0,0,0.6)', 'rgba(0,0,0,0.8)']}
+                                style={StyleSheet.absoluteFill}
+                            />
 
-                        <View style={styles.cardContent}>
-                            <View style={styles.iconContainer}>
-                                <Text style={styles.icon}>{cls.icon}</Text>
-                            </View>
-                            <Text style={[styles.className, isSelected && { color: '#06b6d4' }]}>{cls.name.toUpperCase()}</Text>
-                            
-                            {isSelected && (
-                                <View style={styles.selectedContent}>
-                                    <Text style={styles.description}>{cls.desc}</Text>
-                                    <View style={styles.statsContainer}>
-                                        <Text style={styles.statText}>STR: {cls.stats.strength}</Text>
-                                        <Text style={styles.statText}>AGI: {cls.stats.agility}</Text>
-                                        <Text style={styles.statText}>VIT: {cls.stats.vitality}</Text>
-                                    </View>
+                            {/* UNSELECTED STATE: Vertical Text */}
+                            {!isSelected && (
+                                <View style={styles.verticalTitleContainer}>
+                                    <Text style={styles.verticalTitle}>{cls.name}</Text>
                                 </View>
                             )}
-                        </View>
-                    </TouchableOpacity>
+
+                            {/* SELECTED STATE: Full Details */}
+                            {isSelected && (
+                                <MotiView 
+                                    from={{ opacity: 0, translateY: 10 }}
+                                    animate={{ opacity: 1, translateY: 0 }}
+                                    transition={{ delay: 100 }}
+                                    style={styles.selectedContent}
+                                >
+                                    <View style={styles.iconBadge}>
+                                        <Text style={{ fontSize: 20 }}>{cls.icon}</Text>
+                                    </View>
+                                    <Text style={styles.selectedTitle}>{cls.name}</Text>
+                                    <Text style={styles.selectedSubtitle}>{cls.subtitle}</Text>
+                                    <Text style={styles.selectedDesc}>{cls.desc}</Text>
+
+                                    {/* Stats Bars */}
+                                    <View style={styles.statsContainer}>
+                                        {Object.entries(cls.stats).map(([stat, val]) => (
+                                            <View key={stat} style={styles.statRow}>
+                                                <View style={styles.statLabelRow}>
+                                                    <Text style={styles.statLabel}>{stat}</Text>
+                                                    <Text style={styles.statValue}>{val}</Text>
+                                                </View>
+                                                <View style={styles.statBarBg}>
+                                                    <MotiView 
+                                                        from={{ width: '0%' }}
+                                                        animate={{ width: `${val}%` }}
+                                                        transition={{ duration: 1000 }}
+                                                        style={styles.statBarFill} 
+                                                    />
+                                                </View>
+                                            </View>
+                                        ))}
+                                    </View>
+                                </MotiView>
+                            )}
+                        </TouchableOpacity>
+                    </MotiView>
                 );
             })}
-        </ScrollView>
+        </View>
 
-        <View style={[styles.footer, { paddingBottom: insets.bottom + 20 }]}>
+        {/* Footer Button */}
+        <View style={[styles.footer, { paddingBottom: insets.bottom + 10 }]}>
             <TouchableOpacity
-                style={[styles.confirmButton, !selectedClass && styles.confirmButtonDisabled]}
-                disabled={!selectedClass || loading}
+                style={[styles.confirmButton, loading && styles.confirmButtonDisabled]}
+                disabled={loading}
                 onPress={handleConfirm}
             >
                 {loading ? (
-                    <ActivityIndicator color="#000" />
+                    <ActivityIndicator color="#fff" />
                 ) : (
-                    <Text style={styles.confirmButtonText}>
-                        {selectedClass ? 'CONFIRM SELECTION' : 'SELECT A CLASS'}
-                    </Text>
+                    <View style={styles.btnInner}>
+                        <Text style={styles.confirmButtonText}>CONFIRM SELECTION</Text>
+                        <Text style={{ color: '#fff', marginLeft: 10 }}>→</Text>
+                    </View>
                 )}
             </TouchableOpacity>
         </View>
+
       </SafeAreaView>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
+  container: { flex: 1, backgroundColor: '#020617' },
+  center: { justifyContent: 'center', alignItems: 'center' },
+  safeArea: { flex: 1 },
+  loadingText: { color: '#06b6d4', marginTop: 20, fontWeight: 'bold', letterSpacing: 2 },
+
+  // Header HUD
+  header: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 10, zIndex: 10 },
+  statusRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  statusDot: { width: 6, height: 6, backgroundColor: '#06b6d4', borderRadius: 3 },
+  statusText: { color: 'rgba(34,211,238,0.7)', fontSize: 10, fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', fontWeight: 'bold' },
+  modeText: { color: 'rgba(255,255,255,0.4)', fontSize: 10, fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', marginTop: 2 },
+
+  titleContainer: { alignItems: 'center', marginBottom: 10, zIndex: 10 },
+  mainTitle: { fontSize: 32, fontWeight: '900', color: '#fff', letterSpacing: 1, textShadowColor: '#3b82f6', textShadowRadius: 15 },
+  subTitle: { fontSize: 10, color: '#bfdbfe', letterSpacing: 3, opacity: 0.6, marginTop: 4 },
+
+  // --- VERTICAL PANE LAYOUT ---
+  paneContainer: {
     flex: 1,
-    backgroundColor: '#020617',
+    flexDirection: 'row', // Horizontal Layout
+    paddingHorizontal: 8,
+    gap: 4,
+    marginBottom: 80, // Space for footer
   },
-  background: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    top: 0,
-    bottom: 0,
-  },
-  safeArea: {
-    flex: 1,
-  },
-  header: {
-    paddingHorizontal: 20,
-    paddingVertical: 20,
-    alignItems: 'center',
-  },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: '900',
-    color: '#06b6d4',
-    letterSpacing: 2,
-    textShadowColor: 'rgba(6, 182, 212, 0.5)',
-    textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 10,
-  },
-  headerSubtitle: {
-    fontSize: 10,
-    color: '#94a3b8',
-    letterSpacing: 4,
-    marginTop: 5,
-  },
-  gridContainer: {
-    padding: 16,
-    paddingBottom: 100,
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-  },
-  classCard: {
-    width: (width - 48) / 2,
-    height: 200, // Taller cards
-    marginBottom: 16,
-    borderRadius: 8,
-    borderWidth: 1,
+  pane: {
+    height: '100%',
+    borderRadius: 4,
     overflow: 'hidden',
-    backgroundColor: '#1e293b',
     position: 'relative',
+    borderWidth: 1,
   },
-  classCardSelected: {
-    height: 220, // Grow slightly when selected? Or just visual pop
-    transform: [{ scale: 1.02 }],
-    shadowColor: '#06b6d4',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.5,
+  paneSelected: {
+    borderColor: '#22d3ee',
+    zIndex: 10,
+    shadowColor: '#22d3ee',
+    shadowOpacity: 0.3,
     shadowRadius: 15,
     elevation: 10,
-    zIndex: 10,
   },
-  classImage: {
+  paneUnselected: {
+    borderColor: 'rgba(255,255,255,0.1)',
+  },
+  paneImage: {
+    ...StyleSheet.absoluteFillObject,
     width: '100%',
     height: '100%',
     resizeMode: 'cover',
-    opacity: 0.8,
   },
-  gradientOverlay: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    height: '70%',
-  },
-  selectedBorder: {
-    position: 'absolute',
-    inset: 0,
-    borderWidth: 2,
-    borderColor: '#06b6d4',
-    borderRadius: 8,
-  },
-  cardContent: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    padding: 12,
+
+  // Vertical Text Logic
+  verticalTitleContainer: {
+    flex: 1,
+    justifyContent: 'center',
     alignItems: 'center',
   },
-  iconContainer: {
-    marginBottom: 4,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    borderRadius: 20,
-    padding: 4,
-  },
-  icon: {
-    fontSize: 16,
-  },
-  className: {
-    fontSize: 14,
+  verticalTitle: {
+    color: 'rgba(255,255,255,0.5)',
+    fontSize: 20,
     fontWeight: '900',
-    color: '#fff',
-    letterSpacing: 1,
-    marginBottom: 4,
-  },
-  selectedContent: {
-    alignItems: 'center',
-    width: '100%',
-  },
-  description: {
-    fontSize: 8,
-    color: '#cbd5e1',
+    letterSpacing: 4,
+    // Rotate text -90 degrees
+    transform: [{ rotate: '-90deg' }],
+    width: 400, // Ensure width doesn't wrap when rotated
     textAlign: 'center',
-    marginBottom: 8,
-    lineHeight: 12,
   },
-  statsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    width: '100%',
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.1)',
-    paddingTop: 4,
+
+  // Selected Content Logic
+  selectedContent: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    padding: 20,
+    paddingBottom: 40,
   },
-  statText: {
-    fontSize: 8,
-    color: '#06b6d4',
-    fontWeight: 'bold',
+  iconBadge: {
+    width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center', alignItems: 'center', marginBottom: 10,
+    borderWidth: 1, borderColor: '#22d3ee'
   },
+  selectedTitle: { fontSize: 32, fontWeight: '900', color: '#fff', letterSpacing: 1 },
+  selectedSubtitle: { fontSize: 10, color: '#06b6d4', fontWeight: 'bold', letterSpacing: 2, marginBottom: 8 },
+  selectedDesc: { fontSize: 12, color: '#cbd5e1', lineHeight: 16, marginBottom: 20 },
+
+  // Stats
+  statsContainer: { gap: 8 },
+  statRow: { gap: 4 },
+  statLabelRow: { flexDirection: 'row', justifyContent: 'space-between' },
+  statLabel: { fontSize: 9, color: 'rgba(255,255,255,0.6)', fontWeight: 'bold' },
+  statValue: { fontSize: 9, color: '#06b6d4', fontWeight: 'bold' },
+  statBarBg: { height: 3, backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 2, overflow: 'hidden' },
+  statBarFill: { height: '100%', backgroundColor: '#06b6d4' },
+
+  // Footer
   footer: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    backgroundColor: 'rgba(2, 6, 23, 0.9)',
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.1)',
+    position: 'absolute', bottom: 0, left: 0, right: 0,
+    alignItems: 'center', justifyContent: 'center',
+    paddingTop: 10,
   },
   confirmButton: {
-    backgroundColor: '#06b6d4',
-    paddingVertical: 16,
-    borderRadius: 4,
+    width: '90%',
+    backgroundColor: 'rgba(0,0,0,0.8)',
+    borderWidth: 1, borderColor: '#22d3ee',
+    paddingVertical: 15,
+    borderRadius: 2, // Slight sharp tech look
     alignItems: 'center',
-    shadowColor: '#06b6d4',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.5,
-    shadowRadius: 10,
-    elevation: 5,
   },
-  confirmButtonDisabled: {
-    backgroundColor: '#334155',
-    shadowOpacity: 0,
-  },
-  confirmButtonText: {
-    color: '#000',
-    fontSize: 14,
-    fontWeight: '900',
-    letterSpacing: 2,
-  },
+  confirmButtonDisabled: { opacity: 0.7 },
+  confirmButtonText: { color: '#fff', fontSize: 14, fontWeight: '900', letterSpacing: 3 },
+  btnInner: { flexDirection: 'row', alignItems: 'center' },
 });
-
-export default ClassSelectionScreen;

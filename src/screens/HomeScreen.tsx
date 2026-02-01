@@ -19,6 +19,7 @@ import * as Haptics from 'expo-haptics';
 import { useAuth } from '../contexts/AuthContext';
 import { Settings } from 'lucide-react-native';
 import { playHunterSound } from '../utils/audio';
+import { useNotification } from '../contexts/NotificationContext';
 
 import { HunterHeader } from '../components/HunterHeader';
 import { StatusWindowModal } from '../components/modals/StatusWindowModal';
@@ -26,17 +27,18 @@ import VitalitySection from '../components/VitalitySection';
 import TrainingWidget from '../components/TrainingWidget';
 import DungeonView from '../components/DungeonView';
 
-import { TrainingLogModal } from '../components/modals/TrainingLogModal';
+import TrainingLogModal from '../components/modals/TrainingLogModal';
 
 const HomeScreen: React.FC = () => {
   const navigation = useNavigation<any>();
   const { user, setUser } = useAuth();
+  const { showNotification } = useNotification();
   const [refreshing, setRefreshing] = useState(false);
   const [showStatusWindow, setShowStatusWindow] = useState(false);
   const [isTrainingLogVisible, setIsTrainingLogVisible] = useState(false);
-  const [initialTrainingTab, setInitialTrainingTab] = useState<'training' | 'dietary'>('training');
+  const [initialTrainingTab, setInitialTrainingTab] = useState<'training' | 'nutrition'>('training');
 
-  const handleOpenTrainingLog = (tab: 'training' | 'dietary') => {
+  const handleOpenTrainingLog = (tab: 'training' | 'nutrition') => {
     setInitialTrainingTab(tab);
     setIsTrainingLogVisible(true);
   };
@@ -78,7 +80,6 @@ const HomeScreen: React.FC = () => {
           setShowStatusWindow={setShowStatusWindow}
           fastBoot={false}
           setFastBoot={() => {}}
-          showNotification={() => {}}
           toggleIncognito={() => {}}
         />
         <StatusWindowModal 

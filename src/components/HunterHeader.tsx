@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
+import { useAuth } from '../contexts/AuthContext';
 import SettingsModal from './modals/SettingsModal';
+import { useNotification } from '../contexts/NotificationContext';
 import { 
   View, 
   Text, 
@@ -27,7 +29,6 @@ interface HunterHeaderProps {
   setShowStatusWindow: (show: boolean) => void;
   fastBoot: boolean;
   setFastBoot: (fast: boolean) => void;
-  showNotification: (msg: string) => void;
   toggleIncognito: () => void;
 }
 
@@ -36,9 +37,10 @@ export const HunterHeader: React.FC<HunterHeaderProps> = ({
   setShowStatusWindow,
   fastBoot,
   setFastBoot,
-  showNotification,
   toggleIncognito
 }) => {
+  const { showNotification } = useNotification();
+  const { logout } = useAuth();
   const insets = useSafeAreaInsets();
   const [showSettings, setShowSettings] = useState(false);
   const [showAvatarViewer, setShowAvatarViewer] = useState(false);
@@ -99,8 +101,8 @@ export const HunterHeader: React.FC<HunterHeaderProps> = ({
         user={user}
         fastBoot={fastBoot}
         setFastBoot={setFastBoot}
-        showNotification={showNotification}
         toggleIncognito={toggleIncognito}
+        onLogout={logout}
       />
 
       <AvatarViewerModal

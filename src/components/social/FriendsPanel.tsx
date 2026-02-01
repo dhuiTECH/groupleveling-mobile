@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TextInput, ScrollView, TouchableOpacity, Image, FlatList } from 'react-native';
+import { View, Text, StyleSheet, TextInput, ScrollView, TouchableOpacity, Image, FlatList, RefreshControl } from 'react-native';
 import { Search, UserPlus, Check, X, Send } from 'lucide-react-native';
 import LayeredAvatar from '../LayeredAvatar';
 import { User } from '../../types/user';
@@ -17,6 +17,8 @@ interface FriendsPanelProps {
   handleRejectFriendRequest: (requestId: string) => void;
   handleCancelOutgoingRequest: (friendshipId: string) => void;
   setSelectedAvatar: (user: any) => void;
+  isSocialLoading: boolean;
+  onRefresh: () => void;
 }
 
 const FriendsPanel: React.FC<FriendsPanelProps> = ({
@@ -31,7 +33,9 @@ const FriendsPanel: React.FC<FriendsPanelProps> = ({
   handleAcceptFriendRequest,
   handleRejectFriendRequest,
   handleCancelOutgoingRequest,
-  setSelectedAvatar
+  setSelectedAvatar,
+  isSocialLoading,
+  onRefresh
 }) => {
   const [query, setQuery] = useState('');
 
@@ -48,7 +52,17 @@ const FriendsPanel: React.FC<FriendsPanelProps> = ({
   );
 
   return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+    <ScrollView 
+      style={styles.container} 
+      showsVerticalScrollIndicator={false}
+      refreshControl={
+        <RefreshControl 
+          refreshing={isSocialLoading} 
+          onRefresh={onRefresh} 
+          tintColor="#22d3ee"
+        />
+      }
+    >
       {/* Search Bar */}
       <View style={styles.searchContainer}>
         <Search size={16} color="#64748b" style={styles.searchIcon} />

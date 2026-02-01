@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Image } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, Image, RefreshControl } from 'react-native';
 import { RefreshCw, Trophy } from 'lucide-react-native'; // Using lucide-react-native for consistency
 import LayeredAvatar from '../LayeredAvatar';
 import { RANK_COLORS } from '../../constants/gameConstants';
@@ -9,12 +9,16 @@ interface RankingsPanelProps {
   leaderboard: any[];
   loadLeaderboard: () => void;
   setSelectedAvatar: (user: any) => void;
+  isSocialLoading: boolean;
+  onRefresh: () => void;
 }
 
 const RankingsPanel: React.FC<RankingsPanelProps> = ({ 
   leaderboard, 
   loadLeaderboard, 
-  setSelectedAvatar 
+  setSelectedAvatar,
+  isSocialLoading,
+  onRefresh
 }) => {
   const getRankingClass = (index: number) => {
     if (index === 0) return styles.rankingGold;
@@ -88,6 +92,13 @@ const RankingsPanel: React.FC<RankingsPanelProps> = ({
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl 
+              refreshing={isSocialLoading} 
+              onRefresh={onRefresh} 
+              tintColor="#22d3ee"
+            />
+          }
         />
       )}
     </View>

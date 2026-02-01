@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Image, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Image, ActivityIndicator, RefreshControl } from 'react-native';
 import { RefreshCw, X, Shield, Plus, Loader2 } from 'lucide-react-native';
 import { MotiView } from 'moti';
 import LayeredAvatar from '../LayeredAvatar';
@@ -22,6 +22,8 @@ interface AssociationPanelProps {
   handleApplicantDecision: (applicantId: string, action: 'accept' | 'reject') => void;
   handleCreateAssociation: () => void;
   setSelectedAvatar: (user: any) => void;
+  isSocialLoading: boolean;
+  onRefresh: () => void;
 }
 
 const AssociationPanel: React.FC<AssociationPanelProps> = ({
@@ -40,7 +42,9 @@ const AssociationPanel: React.FC<AssociationPanelProps> = ({
   loadPendingApplicants,
   handleApplicantDecision,
   handleCreateAssociation,
-  setSelectedAvatar
+  setSelectedAvatar,
+  isSocialLoading,
+  onRefresh
 }) => {
   const [showFoundingForm, setShowFoundingForm] = useState(false);
 
@@ -55,7 +59,17 @@ const AssociationPanel: React.FC<AssociationPanelProps> = ({
   };
 
   return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+    <ScrollView 
+      style={styles.container} 
+      showsVerticalScrollIndicator={false}
+      refreshControl={
+        <RefreshControl 
+          refreshing={isSocialLoading} 
+          onRefresh={onRefresh} 
+          tintColor="#22d3ee"
+        />
+      }
+    >
       <View style={styles.header}>
         <Text style={styles.headerTitle}>HUNTER_ASSOCIATION</Text>
       </View>
