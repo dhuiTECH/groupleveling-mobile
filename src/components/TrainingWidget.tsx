@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
+import { Footprints } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { api } from '../api/nutrition';
 
@@ -142,7 +143,7 @@ const TrainingWidget: React.FC<TrainingWidgetProps> = ({
         {/* Progress Bar */}
         <View style={styles.progressSection}>
           <View style={styles.progressHeader}>
-            <Image source={require('../../assets/icons/gachapon.png')} style={{ width: 14, height: 14, tintColor: '#22d3ee' }} />
+            <Footprints size={14} color="#22d3ee" />
             <Text style={styles.progressValue}>{user?.daily_steps || 0} / 10,000</Text>
           </View>
           <View style={styles.progressBarBg}>
