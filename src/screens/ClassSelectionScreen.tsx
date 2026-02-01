@@ -284,11 +284,10 @@ const ClassSelectionScreen = () => {
                                     transition={{ delay: 100 }}
                                     style={styles.selectedContent}
                                 >
-                                    <View style={styles.iconBadge}>
+                                    <View style={styles.titleRow}>
                                         <Image source={cls.icon} style={styles.iconImage} resizeMode="contain" />
+                                        <Text style={styles.selectedTitle}>{cls.name}</Text>
                                     </View>
-
-                                    <Text style={styles.selectedTitle}>{cls.name}</Text>
                                     <Text style={styles.selectedSubtitle}>{cls.subtitle}</Text>
                                     <Text style={styles.selectedDesc}>{cls.desc}</Text>
 
@@ -417,15 +416,17 @@ const styles = StyleSheet.create({
     padding: 20,
     paddingBottom: 40,
   },
-  iconBadge: {
-    justifyContent: 'center', alignItems: 'center', 
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
     marginBottom: 10,
   },
   iconImage: {
-    width: 60, height: 60,
+    width: 44, height: 44,
   },
 
-  selectedTitle: { fontSize: 22, fontWeight: '900', color: '#fff', letterSpacing: 1 },
+  selectedTitle: { fontSize: 11, fontWeight: '900', color: '#fff', letterSpacing: 1, flexShrink: 1 },
   selectedSubtitle: { fontSize: 10, color: '#06b6d4', fontWeight: 'bold', letterSpacing: 2, marginBottom: 8 },
   selectedDesc: { fontSize: 12, color: '#cbd5e1', lineHeight: 16, marginBottom: 20 },
 
