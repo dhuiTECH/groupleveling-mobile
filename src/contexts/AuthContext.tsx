@@ -3,6 +3,27 @@ import { supabase } from '../lib/supabase';
 import { User as SupabaseUser } from '@supabase/supabase-js';
 import { User } from '../types/user';
 
+export const resolveAvatar = (avatar: string | null) => {
+  if (!avatar) return require('../../assets/sungjinwoo.png');
+  if (avatar.startsWith('http')) return { uri: avatar };
+  
+  // Handle local assets
+  const cleanName = avatar.replace(/^\//, '');
+  switch (cleanName) {
+    case 'NoobMan.png':
+    case 'NoobMan':
+      return require('../../assets/NoobMan.png');
+    case 'NoobWoman.png':
+    case 'NoobWoman':
+      return require('../../assets/NoobWoman.png');
+    case 'Noobnonbinary.png':
+    case 'Noobnonbinary':
+      return require('../../assets/Noobnonbinary.png');
+    default:
+      return { uri: avatar };
+  }
+};
+
 interface AuthContextType {
   user: User | null;
   supabaseUser: SupabaseUser | null;
@@ -74,7 +95,7 @@ export function AuthProvider({ children }: AuthProviderProps): JSX.Element {
               max_hp: profile.max_hp,
               current_mp: profile.current_mp,
               max_mp: profile.max_mp,
-              profilePicture: profile.avatar ? { uri: profile.avatar } : require('../../assets/sungjinwoo.png'),
+              profilePicture: resolveAvatar(profile.avatar),
             } as User);
           }
         } catch (err) {
@@ -132,7 +153,7 @@ export function AuthProvider({ children }: AuthProviderProps): JSX.Element {
                 max_hp: profile.max_hp,
                 current_mp: profile.current_mp,
                 max_mp: profile.max_mp,
-                profilePicture: profile.avatar ? { uri: profile.avatar } : require('../../assets/sungjinwoo.png'),
+                profilePicture: resolveAvatar(profile.avatar),
               } as User);
              }
           } catch (err) {

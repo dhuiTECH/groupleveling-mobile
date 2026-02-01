@@ -3,7 +3,7 @@ import { View, StyleSheet } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { RootStackScreenProps } from '../types/navigation';
 import * as Haptics from 'expo-haptics';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth, resolveAvatar } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { playHunterSound } from '../utils/audio';
 
@@ -54,9 +54,9 @@ export default function SignupScreen() {
       // Upsert partial profile immediately after login
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {
-          let avatarUrl = '/NoobMan.png';
-          if (data.gender === 'Female') avatarUrl = '/NoobWoman.png';
-          else if (data.gender === 'Non-binary') avatarUrl = '/Noobnonbinary.png';
+          let avatarUrl = 'NoobMan.png';
+          if (data.gender === 'Female') avatarUrl = 'NoobWoman.png';
+          else if (data.gender === 'Non-binary') avatarUrl = 'Noobnonbinary.png';
 
           await supabase.from('profiles').upsert({
             id: session.user.id,
@@ -83,9 +83,9 @@ export default function SignupScreen() {
       const userId = (await supabase.auth.getSession()).data.session?.user.id;
       if (!userId) throw new Error('User session not found');
 
-      let avatarUrl = '/NoobMan.png';
-      if (data.gender === 'Female') avatarUrl = '/NoobWoman.png';
-      else if (data.gender === 'Non-binary') avatarUrl = '/Noobnonbinary.png';
+      let avatarUrl = 'NoobMan.png';
+      if (data.gender === 'Female') avatarUrl = 'NoobWoman.png';
+      else if (data.gender === 'Non-binary') avatarUrl = 'Noobnonbinary.png';
 
       const updates = {
           id: userId,
@@ -114,12 +114,13 @@ export default function SignupScreen() {
           current_class: data.selectedClass,
           gender: data.gender,
           onboarding_completed: true,
-          profilePicture: { uri: avatarUrl } // Optimistic update
+          avatar: avatarUrl,
+          profilePicture: resolveAvatar(avatarUrl)
         });
       }
 
       // Finalize awakening logic
-      playHunterSound('levelUp');
+      playHunterSound('activation');
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       
       navigation.reset({

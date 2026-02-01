@@ -7,6 +7,7 @@ const SOUND_FILES: Record<string, any> = {
   error: require('../../assets/sounds/error.mp3'),
   loginSuccess: require('../../assets/sounds/loginsuccess.mp3'),
   purchaseSuccess: require('../../assets/sounds/purchasesuccess.mp3'),
+  activation: require('../../assets/sounds/activation.mp3'),
 };
 
 export type SoundKey = keyof typeof SOUND_FILES;

@@ -1,12 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, Image, Alert, ActivityIndicator, Dimensions, Platform } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth, resolveAvatar } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MotiView } from 'moti'; 
+import { playClassVoiceOver, stopClassVoiceOver } from '../utils/audioPlayer';
+import { debounce } from '../utils/debounce';
+import { playHunterSound } from '../utils/audio';
 
 // --- ASSET IMPORTS ---
 const classImages = {
@@ -93,6 +96,10 @@ const ClassSelectionScreen = () => {
   const [loading, setLoading] = useState(false);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
 
+  const debouncedPlayVoiceOver = useRef(debounce((classId: string) => {
+    playClassVoiceOver(classId);
+  }, 300)).current;
+
   const { gender, name } = route.params || {};
 
   useEffect(() => {
@@ -134,6 +141,8 @@ const ClassSelectionScreen = () => {
   const handleClassSelect = (classId: string) => {
     Haptics.selectionAsync();
     setSelectedClass(classId);
+    stopClassVoiceOver(); // Stop any currently playing audio
+    debouncedPlayVoiceOver(classId); // Play the new audio with debounce
   };
 
   const handleConfirm = async () => {
@@ -149,9 +158,9 @@ const ClassSelectionScreen = () => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
     try {
-        let avatarUrl = '/NoobMan.png';
-        if (gender === 'Female') avatarUrl = '/NoobWoman.png';
-        else if (gender === 'Non-binary') avatarUrl = '/Noobnonbinary.png';
+        let avatarUrl = 'NoobMan.png';
+        if (gender === 'Female') avatarUrl = 'NoobWoman.png';
+        else if (gender === 'Non-binary') avatarUrl = 'Noobnonbinary.png';
 
         const { error } = await supabase
             .from('profiles')
@@ -178,17 +187,18 @@ const ClassSelectionScreen = () => {
                 onboarding_completed: true,
                 gender: gender || user.gender || 'Male',
                 name: name || user.name || 'Hunter',
-                profilePicture: { uri: avatarUrl }
+                avatar: avatarUrl, // Add this to keep local state in sync
+                profilePicture: resolveAvatar(avatarUrl)
             });
         }
 
-        Alert.alert('System Message', 'Class Awakening Complete.', [
-            { text: 'ENTER', onPress: () => {
-                // No explicit navigation reset needed if AppNavigator handles state
-                // But for safety/animation:
-                // navigation.reset({ index: 0, routes: [{ name: 'Home' }] }) 
-            }}
-        ]);
+        // Play activation sound and navigate immediately for immersion
+        playHunterSound('activation');
+        
+        navigation.reset({
+            index: 0,
+            routes: [{ name: 'Home' }],
+        });
 
     } catch (error: any) {
         Alert.alert('Error', error.message);
