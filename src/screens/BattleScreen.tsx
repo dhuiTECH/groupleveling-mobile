@@ -1,11 +1,9 @@
-import React, { useState, useRef } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Dimensions, Animated, PanResponder, SafeAreaView, StatusBar, ActivityIndicator, Image } from 'react-native';
-import Svg, { Path, Circle as SvgCircle } from 'react-native-svg';
-import { Sword, RotateCcw, Play, ArrowUp, Skull, Hexagon } from 'lucide-react-native';
-import { useBattleLogic, PHASE, ACTOR_TYPE, SIGILS, getPointOnPath } from '@/hooks/useBattleLogic';
+import React, { useState, useRef, useEffect } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, Dimensions, Animated, SafeAreaView, StatusBar, ActivityIndicator, Image } from 'react-native';
+import { Sword, RotateCcw, Play, ArrowUp, Skull, Hexagon, Settings } from 'lucide-react-native';
+import { useBattleLogic, PHASE, ACTOR_TYPE } from '@/hooks/useBattleLogic';
 import LayeredAvatar from '@/components/LayeredAvatar';
 import { useNavigation, useRoute } from '@react-navigation/native';
-import { LinearGradient } from 'expo-linear-gradient';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -31,15 +29,11 @@ export default function BattleScreen() {
     plannedAbilities,
     selectedAbilityId,
     enemyTargetId,
-    parryMode,
-    targetSigil,
-    targetSlider,
+    qteTargets,
+    handleQteTap,
     parryTimer,
     parryPreDelay,
     parryWindowActive,
-    isHolding,
-    setIsHolding,
-    setSliderSync,
     successFlash,
     failFlash,
     shakeAnim,
@@ -53,72 +47,151 @@ export default function BattleScreen() {
     resolveEnemyAttack,
     getProjectedDetail,
     basicAbility,
+    lastDamageEvent,
   } = useBattleLogic({ encounterId, raidId, isBoss });
 
-  const [sliderLayout, setSliderLayout] = useState({x: 0, y: 0, width: 0, height: 0});
+  // --- Particles System ---
+  const [particles, setParticles] = useState<any[]>([]);
+  const [shockwaves, setShockwaves] = useState<any[]>([]); // New Shockwave State
+  const prevQteTargetsRef = useRef<any[]>([]);
 
-  // Slider Pan Responder
-  const panResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onPanResponderGrant: () => {
-        setIsHolding(true);
-      },
-      onPanResponderMove: (evt, gestureState) => {
-        if (!targetSlider || !sliderLayout.width) return;
-        
-        // Normalize touch coordinates relative to the slider view
-        const touchX = evt.nativeEvent.locationX;
-        const touchY = evt.nativeEvent.locationY;
-        
-        // Convert to 0-100 scale used by SVG logic
-        const scaledX = (touchX / sliderLayout.width) * 100;
-        const scaledY = (touchY / sliderLayout.height) * 100;
+  // 1. Detect Hit/Miss to spawn particles
+  useEffect(() => {
+      qteTargets.forEach(target => {
+          const prev = prevQteTargetsRef.current.find(t => t.id === target.id);
+          if (!prev) return;
+          
+          // Detect Status Change
+          if (prev.status !== 'hit' && target.status === 'hit') {
+              spawnParticles(target.x, target.y, '#22d3ee');
+              spawnShockwave(target.x, target.y, '#22d3ee');
+          } else if (prev.status !== 'miss' && target.status === 'miss') {
+              spawnParticles(target.x, target.y, '#ef4444');
+              spawnShockwave(target.x, target.y, '#ef4444');
+          }
+      });
+      prevQteTargetsRef.current = qteTargets;
+  }, [qteTargets]);
 
-        // Import helper function or duplicate logic? Let's assume helper is exported or we use logic from hook if returned.
-        // Since getPointOnPath is exported from hook file but not returned by hook, we import it.
-        // Wait, I need to import getPointOnPath from the hook file.
-        // Let's assume I updated the import above.
-        
-        // RE-IMPLEMENT helper here to avoid import issues for now if not exported
-        const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
-        const getPoint = (checkpoints: any[], t: number) => {
-            if (t <= 0) return checkpoints[0];
-            if (t >= 1) return checkpoints[checkpoints.length - 1];
-            const segmentCount = checkpoints.length - 1;
-            const scaledT = t * segmentCount;
-            const index = Math.floor(scaledT);
-            const localT = scaledT - index;
-            const p1 = checkpoints[index];
-            const p2 = checkpoints[index + 1];
-            return { x: lerp(p1.x, p2.x, localT), y: lerp(p1.y, p2.y, localT) };
-        };
-
-        const ballPos = getPoint(targetSlider.checkpoints, parryTimer / 100);
-        const dist = Math.sqrt(Math.pow(scaledX - ballPos.x, 2) + Math.pow(scaledY - ballPos.y, 2));
-        
-        // 22 is tolerance
-        setSliderSync(dist < 22);
-      },
-      onPanResponderRelease: () => {
-        setIsHolding(false);
+  const spawnParticles = (xPct: number, yPct: number, color: string) => {
+      const x = (xPct / 100) * SCREEN_WIDTH;
+      const y = (yPct / 100) * SCREEN_HEIGHT;
+      const newParts = [];
+      for(let i=0; i<30; i++) { // Increased count
+          const angle = Math.random() * Math.PI * 2;
+          const speed = Math.random() * 15 + 5; // Faster explosion
+          newParts.push({
+              id: Math.random().toString(),
+              x,
+              y,
+              vx: Math.cos(angle) * speed,
+              vy: Math.sin(angle) * speed,
+              life: 1.0,
+              color,
+              size: Math.random() * 12 + 6 // Larger particles
+          });
       }
-    })
-  ).current;
-
-  // Re-implement getPoint for render
-  const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
-  const getPoint = (checkpoints: any[], t: number) => {
-      if (t <= 0) return checkpoints[0];
-      if (t >= 1) return checkpoints[checkpoints.length - 1];
-      const segmentCount = checkpoints.length - 1;
-      const scaledT = t * segmentCount;
-      const index = Math.floor(scaledT);
-      const localT = scaledT - index;
-      const p1 = checkpoints[index];
-      const p2 = checkpoints[index + 1];
-      return { x: lerp(p1.x, p2.x, localT), y: lerp(p1.y, p2.y, localT) };
+      setParticles(prev => [...prev, ...newParts]);
   };
+
+  const spawnShockwave = (xPct: number, yPct: number, color: string) => {
+      const x = (xPct / 100) * SCREEN_WIDTH;
+      const y = (yPct / 100) * SCREEN_HEIGHT;
+      setShockwaves(prev => [...prev, {
+          id: Math.random().toString(),
+          x,
+          y,
+          scale: 0.1,
+          opacity: 1.0,
+          color
+      }]);
+  };
+
+  // 2. Animation Loop
+  useEffect(() => {
+      if (particles.length === 0 && shockwaves.length === 0) return;
+      
+      const interval = setInterval(() => {
+          // Update Particles
+          setParticles(prev => {
+              if (prev.length === 0) return prev;
+              return prev.map(p => ({
+                  ...p,
+                  x: p.x + p.vx,
+                  y: p.y + p.vy,
+                  vx: p.vx * 0.92, 
+                  vy: p.vy * 0.92,
+                  life: p.life - 0.04
+              })).filter(p => p.life > 0);
+          });
+
+          // Update Shockwaves
+          setShockwaves(prev => {
+              if (prev.length === 0) return prev;
+              return prev.map(s => ({
+                  ...s,
+                  scale: s.scale + 0.15, // Expand fast
+                  opacity: s.opacity - 0.05 // Fade
+              })).filter(s => s.opacity > 0);
+          });
+
+      }, 16); 
+      return () => clearInterval(interval);
+  }, [particles.length > 0 || shockwaves.length > 0]);
+
+  // Damage Number Handling
+  const [damageNumbers, setDamageNumbers] = useState<any[]>([]);
+  
+  useEffect(() => {
+    if (lastDamageEvent) {
+        const id = Date.now().toString() + Math.random().toString();
+        // Determine Location
+        let x = SCREEN_WIDTH / 2;
+        let y = 200; // Default enemy y
+        let color = '#fbbf24';
+
+        if (lastDamageEvent.targetId === 'ENEMY') {
+            x = SCREEN_WIDTH / 2;
+            y = 120; // Approx enemy center
+            color = '#fbbf24';
+        } else {
+            // Find player index
+            const idx = party.findIndex(p => p.id === lastDamageEvent.targetId);
+            if (idx >= 0) {
+                // Approximate party layout: centered row with gap=20
+                // Each char figure is ~90 width (scale 0.9 of 100?)
+                // This is rough estimation based on PartyContainer style
+                // Just hardcode based on index for now
+                const totalWidth = party.length * 100 + (party.length - 1) * 20;
+                const startX = (SCREEN_WIDTH - totalWidth) / 2;
+                x = startX + idx * 120 + 50; 
+                y = SCREEN_HEIGHT / 2 + 100; // rough y
+            }
+            color = '#ef4444';
+        }
+
+        const anim = new Animated.Value(0);
+
+        const newNum = {
+            id,
+            value: lastDamageEvent.value,
+            color,
+            x,
+            y,
+            anim
+        };
+        
+        setDamageNumbers(prev => [...prev, newNum]);
+
+        Animated.timing(anim, {
+            toValue: 1,
+            duration: 1000,
+            useNativeDriver: true
+        }).start(() => {
+            setDamageNumbers(prev => prev.filter(n => n.id !== id));
+        });
+    }
+  }, [lastDamageEvent]);
 
   if (loading) {
       return (
@@ -129,13 +202,12 @@ export default function BattleScreen() {
       );
   }
 
-  // Handle End Game
   if (currentPhase === PHASE.VICTORY) {
       return (
           <View style={[styles.container, {justifyContent: 'center'}]}>
               <Text style={[styles.cinematicText, {color: '#4ade80'}]}>VICTORY</Text>
               <TouchableOpacity onPress={() => navigation.goBack()} style={styles.exitBtn}>
-                  <Text style={styles.exitBtnText}>RETURN</Text>
+                  <Text style={styles.exitBtnText}>RETURN TO MAP</Text>
               </TouchableOpacity>
           </View>
       );
@@ -146,17 +218,315 @@ export default function BattleScreen() {
           <View style={[styles.container, {justifyContent: 'center'}]}>
               <Text style={[styles.cinematicText, {color: '#ef4444'}]}>DEFEAT</Text>
               <TouchableOpacity onPress={() => navigation.goBack()} style={styles.exitBtn}>
-                  <Text style={styles.exitBtnText}>RETURN</Text>
+                  <Text style={styles.exitBtnText}>RETURN TO MAP</Text>
               </TouchableOpacity>
           </View>
       );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={styles.container}>
       <StatusBar barStyle="light-content" />
       
-      {/* Cinematic Flash Overlay */}
+      <SafeAreaView style={{ flex: 1 }}>
+        {/* Main Game Frame */}
+        <Animated.View style={[styles.gameFrame, { transform: [{ translateX: shakeAnim }] }]}>
+          
+          {/* --- TOP HUD --- */}
+          <View style={styles.topHud} pointerEvents="box-none">
+              {/* Turn Queue with Pictures */}
+              <View style={styles.turnQueue}>
+                 {turnQueue.slice(queueIndex, queueIndex + 4).map((type: string, i: number) => {
+                     const isEnemy = type === ACTOR_TYPE.ENEMY;
+                     return (
+                         <View key={i} style={[
+                             styles.queueItem, 
+                             i===0 && styles.queueItemActive,
+                             isEnemy ? { borderColor: '#ef4444' } : { borderColor: '#22d3ee' }
+                         ]}>
+                            {isEnemy ? (
+                                enemy?.icon_url ? (
+                                  <Image source={{ uri: enemy.icon_url }} style={styles.queueImage} />
+                                ) : (
+                                  <Text style={{fontSize: 20}}>👾</Text>
+                                )
+                            ) : (
+                                activeChar?.avatar ? (
+                                  <View style={styles.queueAvatarWrapper}>
+                                      <LayeredAvatar user={activeChar.avatar} size={i===0 ? 44 : 28} square hideBackground style={{ backgroundColor: 'transparent' }} />
+                                  </View>
+                                ) : (
+                                  <Text style={{fontSize: 20}}>🥷</Text>
+                                )
+                            )}
+                         </View>
+                     );
+                 })}
+              </View>
+          </View>
+
+          {/* --- BATTLEFIELD --- */}
+          <View style={styles.battlefield}>
+              {/* Enemy Block */}
+              <View style={styles.enemyBlock}>
+                  {enemy && (
+                      <View style={styles.enemyHpStrip}>
+                          <View style={styles.enemyHpStripTop}>
+                              <Text style={styles.enemyHpName} numberOfLines={1}>{enemy.name}</Text>
+                              {enemy.defDebuff > 0 && <Skull size={12} color="#ef4444" />}
+                          </View>
+                          <View style={styles.enemyHpBarTrack}>
+                              <View style={[styles.enemyHpBarFill, { width: `${Math.max(0, (enemy.hp / enemy.maxHP) * 100)}%` }]} />
+                          </View>
+                          <Text style={styles.enemyHpNumbers}>{Math.floor(enemy.hp).toLocaleString()} / {enemy.maxHP.toLocaleString()}</Text>
+                      </View>
+                  )}
+                  
+                  <View style={[styles.enemyFigure, currentPhase === PHASE.ENEMY_STRIKE && styles.enemyAttacking]}>
+                      {enemy?.icon_url ? (
+                          <Image source={{ uri: enemy.icon_url }} style={styles.enemyImage} />
+                      ) : (
+                          <Text style={styles.enemyEmoji}>👾</Text>
+                      )}
+                  </View>
+              </View>
+
+              {/* Chain Counter */}
+              {chainCount > 0 && isPlayerTurnPhase && (
+                  <View style={styles.chainContainer}>
+                      <Text style={styles.chainText}>{chainCount} CHAIN</Text>
+                      <Text style={styles.chainBonus}>+{(chainCount * 10)}% BONUS</Text>
+                  </View>
+              )}
+
+              {/* Player Figures */}
+              <View style={styles.partyContainer}>
+                  {party.map((char: any, index: number) => {
+                      const isActive = index === activeIndex;
+                      const isTargeted = char.id === enemyTargetId;
+                      return (
+                          <TouchableOpacity 
+                              key={char.id} 
+                              onPress={() => { if(isPlayerTurnPhase) { setActiveIndex(index); } }}
+                              style={[styles.charFigure, isActive && styles.charActive, isTargeted && styles.charTargeted]}
+                          >
+                              {/* Layered Avatar */}
+                              {char.avatar ? (
+                                  <LayeredAvatar user={char.avatar} size={130} square hideBackground style={{ backgroundColor: 'transparent' }} />
+                              ) : (
+                                  <Text style={{fontSize: 50}}>🥷</Text>
+                              )}
+                              <View style={styles.charHpContainer}>
+                                  <View style={styles.charHpOnly}>
+                                      <View style={[styles.charHpFill, { width: `${(char.hp / char.maxHP) * 100}%` }]} />
+                                  </View>
+                                  <Text style={styles.charHpText}>{Math.floor(char.hp)}/{char.maxHP}</Text>
+                              </View>
+                              {char.atkBuff > 0 && (
+                                  <View style={styles.charBuffBadge}>
+                                      <ArrowUp size={10} color="#facc15" />
+                                  </View>
+                              )}
+                          </TouchableOpacity>
+                      );
+                  })}
+              </View>
+          </View>
+
+          {/* --- BOTTOM HUD --- */}
+          <View style={styles.bottomHud}>
+              {/* AP Meter */}
+              {isPlayerTurnPhase && activeChar && (
+                  <View style={styles.apMeterContainer}>
+                      <Text style={styles.apLabel}>ACTION POINTS</Text>
+                      <View style={styles.apPips}>
+                          {[...Array(activeChar.maxAP)].map((_, i) => (
+                              <Hexagon 
+                                  key={i} 
+                                  size={18} 
+                                  fill={i < activeChar.ap ? "#22d3ee" : "rgba(34, 211, 238, 0.1)"} 
+                                  color={i < activeChar.ap ? "#22d3ee" : "#334155"} 
+                                  strokeWidth={2}
+                              />
+                          ))}
+                      </View>
+                      <Text style={styles.apValue}>{activeChar.ap} / {activeChar.maxAP}</Text>
+                  </View>
+              )}
+
+              {/* Planned Sequence */}
+              {isPlayerTurnPhase && plannedAbilities.length > 0 && (
+                  <View style={styles.sequenceBar}>
+                      {plannedAbilities.map((item: any, i: number) => (
+                          <View key={i} style={styles.sequenceItem}>
+                              <Text style={styles.sequenceText}>{item.ability.name}</Text>
+                          </View>
+                      ))}
+                  </View>
+              )}
+
+              {/* Tactical Readout */}
+              <View style={styles.readout}>
+                  {currentAbility ? (
+                      <View>
+                          <View style={{flexDirection:'row', justifyContent:'space-between'}}>
+                              <Text style={styles.readoutTitle}>{currentAbility.name}</Text>
+                              <Text style={styles.readoutType}>{getProjectedDetail(currentAbility)?.type}</Text>
+                          </View>
+                          <Text style={styles.readoutDesc}>{currentAbility.description}</Text>
+                          <View style={styles.readoutFooter}>
+                              <View style={{flexDirection:'row', alignItems:'center', gap: 8}}>
+                                  <View style={{flexDirection:'row', gap: 2}}>
+                                       {[...Array(currentAbility.cost)].map((_, i) => (
+                                           <Hexagon key={i} size={10} fill="#22d3ee" color="#22d3ee" />
+                                       ))}
+                                  </View>
+                                  <Text style={styles.readoutLabel}>{getProjectedDetail(currentAbility)?.hits} Hits</Text>
+                              </View>
+                              <Text style={styles.readoutValue}>{getProjectedDetail(currentAbility)?.final}</Text>
+                          </View>
+                      </View>
+                  ) : (
+                      <Text style={styles.logText}>{logs[0]}</Text>
+                  )}
+              </View>
+
+              {/* Controls */}
+              <View style={styles.controlsRow}>
+                  <TouchableOpacity onPress={switchStance} disabled={!isPlayerTurnPhase} style={[styles.ctrlBtn, { borderColor: stance.color }]}>
+                      <Sword size={16} color={stance.color} />
+                      <Text style={[styles.ctrlText, { color: stance.color }]}>{stance.label}</Text>
+                  </TouchableOpacity>
+                  
+                  <TouchableOpacity onPress={undoLastAction} disabled={!isPlayerTurnPhase} style={[styles.ctrlBtnSmall, { borderColor: '#facc15' }]}>
+                      <RotateCcw size={16} color="#facc15" />
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                      onPress={processPlannedActions}
+                      disabled={!isPlayerTurnPhase || plannedAbilities.length === 0}
+                      activeOpacity={0.7}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      style={[styles.ctrlBtn, { borderColor: '#4ade80' }, (plannedAbilities.length === 0) && styles.ctrlBtnDisabled]}
+                  >
+                      <Play size={16} color={plannedAbilities.length === 0 ? '#555' : '#4ade80'} fill={plannedAbilities.length === 0 ? '#555' : '#4ade80'} />
+                      <Text style={[styles.ctrlText, { color: plannedAbilities.length === 0 ? '#555' : '#4ade80' }]}>EXECUTE</Text>
+                  </TouchableOpacity>
+              </View>
+
+              {/* Ability Grid - Compact */}
+              <View style={styles.abilityGrid}>
+                  {(isPlayerTurnPhase && activeChar ? activeChar.abilities : []).map((ability: any) => {
+                      const canAfford = activeChar.ap >= ability.cost && activeChar.hp > 0;
+                      const isSelected = selectedAbilityId === ability.id;
+                      return (
+                          <TouchableOpacity 
+                              key={ability.id} 
+                              onPress={() => handleAbilityTap(ability)}
+                              disabled={!canAfford}
+                              style={[
+                                  styles.abilityBtn, 
+                                  isSelected && styles.abilityBtnSelected,
+                                  !canAfford && styles.abilityBtnDisabled
+                              ]}
+                          >
+                              {isSelected && (
+                                  <View style={styles.confirmBadge}>
+                                      <Text style={styles.confirmText}>CONFIRM</Text>
+                                  </View>
+                              )}
+                              <View>
+                                  <Text style={[styles.abilityName, {marginBottom: 4}]} numberOfLines={1}>{ability.name}</Text>
+                                  <View style={{flexDirection:'row', gap:2}}>
+                                      {[...Array(ability.cost)].map((_, i) => <Hexagon key={i} size={10} fill={isSelected ? "#22d3ee" : (canAfford ? "#22d3ee" : "#555")} color={isSelected ? "#22d3ee" : (canAfford ? "#22d3ee" : "#555")} fillOpacity={isSelected || canAfford ? 0.8 : 0.2} />)}
+                                  </View>
+                              </View>
+                          </TouchableOpacity>
+                      );
+                  })}
+                  {!isPlayerTurnPhase && <Text style={styles.waitingText}>ENEMY TURN...</Text>}
+              </View>
+          </View>
+
+        </Animated.View>
+      </SafeAreaView>
+
+      {/* Floating Damage Numbers */}
+      {damageNumbers.map(num => (
+          <Animated.View 
+              key={num.id}
+              style={{
+                  position: 'absolute',
+                  top: num.y,
+                  left: num.x,
+                  transform: [
+                      { translateY: num.anim.interpolate({ inputRange: [0, 1], outputRange: [0, -80] }) },
+                      { scale: num.anim.interpolate({ inputRange: [0, 0.2, 1], outputRange: [0.5, 1.5, 1] }) }
+                  ],
+                  opacity: num.anim.interpolate({ inputRange: [0, 0.8, 1], outputRange: [1, 1, 0] }),
+                  zIndex: 2000,
+                  marginLeft: -50, // Center
+                  width: 100,
+                  alignItems: 'center'
+              }}
+              pointerEvents="none"
+          >
+              <Text style={{
+                  color: num.color,
+                  fontSize: 32,
+                  fontWeight: '900',
+                  textShadowColor: 'black',
+                  textShadowRadius: 2,
+                  textShadowOffset: { width: 1, height: 1 },
+                  fontStyle: 'italic'
+              }}>
+                  {Math.floor(num.value)}
+              </Text>
+          </Animated.View>
+      ))}
+
+      {/* Shockwaves Layer */}
+      {shockwaves.map(s => (
+          <View 
+              key={s.id}
+              style={{
+                  position: 'absolute',
+                  left: s.x - 100, 
+                  top: s.y - 100,
+                  width: 200,
+                  height: 200,
+                  borderRadius: 100,
+                  borderWidth: 10,
+                  borderColor: s.color,
+                  opacity: s.opacity,
+                  zIndex: 1450, // Below particles
+                  transform: [{ scale: s.scale }]
+              }}
+              pointerEvents="none"
+          />
+      ))}
+
+      {/* Particles Layer */}
+      {particles.map(p => (
+          <View 
+              key={p.id}
+              style={{
+                  position: 'absolute',
+                  left: p.x - p.size/2,
+                  top: p.y - p.size/2,
+                  width: p.size,
+                  height: p.size,
+                  borderRadius: p.size/2,
+                  backgroundColor: p.color,
+                  opacity: p.life,
+                  zIndex: 1500, // Below damage numbers, above QTE
+                  transform: [{ scale: p.life }]
+              }}
+              pointerEvents="none"
+          />
+      ))}
+
+      {/* Overlays centered on device screen */}
       {successFlash && (
         <View style={[styles.flashOverlay, { backgroundColor: 'rgba(34, 211, 238, 0.3)' }]}>
            <Text style={styles.cinematicText}>PERFECT</Text>
@@ -168,257 +538,73 @@ export default function BattleScreen() {
         </View>
       )}
 
-      {/* Main Game Frame */}
-      <Animated.View style={[styles.gameFrame, { transform: [{ translateX: shakeAnim }] }]}>
-        
-        {/* --- TOP HUD --- */}
-        <View style={styles.topHud} pointerEvents="box-none">
-            {/* Turn Queue with Pictures */}
-            <View style={styles.turnQueue}>
-               {turnQueue.slice(queueIndex, queueIndex + 4).map((type: string, i: number) => {
-                   const isEnemy = type === ACTOR_TYPE.ENEMY;
-                   return (
-                       <View key={i} style={[
-                           styles.queueItem, 
-                           i===0 && styles.queueItemActive,
-                           isEnemy ? { borderColor: '#ef4444' } : { borderColor: '#22d3ee' }
-                       ]}>
-                          {isEnemy ? (
-                              enemy?.icon_url ? (
-                                <Image source={{ uri: enemy.icon_url }} style={styles.queueImage} />
-                              ) : (
-                                <Text style={{fontSize: 20}}>👾</Text>
-                              )
-                          ) : (
-                              activeChar?.avatar ? (
-                                <View style={styles.queueAvatarWrapper}>
-                                    <LayeredAvatar user={activeChar.avatar} size={i===0 ? 44 : 28} square hideBackground style={{ backgroundColor: 'transparent' }} />
-                                </View>
-                              ) : (
-                                <Text style={{fontSize: 20}}>🥷</Text>
-                              )
-                          )}
-                       </View>
-                   );
-               })}
-            </View>
-        </View>
+          {/* --- PARRY UI LAYER --- */}
+      {currentPhase === PHASE.ENEMY_STRIKE && (
+          <View style={styles.parryOverlay} pointerEvents="box-none">
+              <View style={styles.parryContainer} pointerEvents="box-none">
+                  <View style={{ width: '100%', height: '100%', position: 'absolute' }}>
+                      {qteTargets.map((target: any, index: number) => {
+                          const isActive = target.status === 'pending' || target.status === 'active';
+                          const isHit = target.status === 'hit';
+                          const isMiss = target.status === 'miss';
+                          
+                          // Calculate progress for approach circle
+                          const approachProgress = parryTimer - (target.hitTime - 25);
+                          
+                          // Visibility checks
+                          if (parryTimer < target.hitTime - 25 && isActive) return null; // Too early
+                          if (parryTimer > (target.hitTime + (target.duration || 0) + 10) && isActive) return null; // Missed/Gone
 
-        {/* --- BATTLEFIELD --- */}
-        <View style={styles.battlefield}>
-            {/* Enemy Block */}
-            <View style={styles.enemyBlock}>
-                {enemy && (
-                    <View style={styles.enemyHpStrip}>
-                        <View style={styles.enemyHpStripTop}>
-                            <Text style={styles.enemyHpName} numberOfLines={1}>{enemy.name}</Text>
-                            {enemy.defDebuff > 0 && <Skull size={12} color="#ef4444" />}
-                        </View>
-                        <View style={styles.enemyHpBarTrack}>
-                            <View style={[styles.enemyHpBarFill, { width: `${Math.max(0, (enemy.hp / enemy.maxHP) * 100)}%` }]} />
-                        </View>
-                        <Text style={styles.enemyHpNumbers}>{Math.floor(enemy.hp).toLocaleString()} / {enemy.maxHP.toLocaleString()}</Text>
-                    </View>
-                )}
-                
-                <View style={[styles.enemyFigure, currentPhase === PHASE.ENEMY_STRIKE && styles.enemyAttacking]}>
-                    {enemy?.icon_url ? (
-                        <Image source={{ uri: enemy.icon_url }} style={styles.enemyImage} />
-                    ) : (
-                        <Text style={styles.enemyEmoji}>👾</Text>
-                    )}
-                </View>
-            </View>
-
-            {/* Chain Counter */}
-            {chainCount > 0 && isPlayerTurnPhase && (
-                <View style={styles.chainContainer}>
-                    <Text style={styles.chainText}>{chainCount} CHAIN</Text>
-                    <Text style={styles.chainBonus}>+{(chainCount * 10)}% BONUS</Text>
-                </View>
-            )}
-
-            {/* Player Figures */}
-            <View style={styles.partyContainer}>
-                {party.map((char: any, index: number) => {
-                    const isActive = index === activeIndex;
-                    const isTargeted = char.id === enemyTargetId;
-                    return (
-                        <TouchableOpacity 
-                            key={char.id} 
-                            onPress={() => { if(isPlayerTurnPhase) { setActiveIndex(index); } }}
-                            style={[styles.charFigure, isActive && styles.charActive, isTargeted && styles.charTargeted]}
-                        >
-                            {/* Layered Avatar */}
-                            {char.avatar ? (
-                                <LayeredAvatar user={char.avatar} size={130} square hideBackground style={{ backgroundColor: 'transparent' }} />
-                            ) : (
-                                <Text style={{fontSize: 50}}>🥷</Text>
-                            )}
-                            <View style={styles.charHpContainer}>
-                                <View style={styles.charHpOnly}>
-                                    <View style={[styles.charHpFill, { width: `${(char.hp / char.maxHP) * 100}%` }]} />
-                                </View>
-                                <Text style={styles.charHpText}>{Math.floor(char.hp)}/{char.maxHP}</Text>
-                            </View>
-                            {char.atkBuff > 0 && (
-                                <View style={styles.charBuffBadge}>
-                                    <ArrowUp size={10} color="#facc15" />
-                                </View>
-                            )}
-                        </TouchableOpacity>
-                    );
-                })}
-            </View>
-        </View>
-
-        {/* --- PARRY UI LAYER --- */}
-        {currentPhase === PHASE.ENEMY_STRIKE && (
-            <View style={styles.parryOverlay} pointerEvents="box-none">
-                <View style={styles.parryContainer}>
-                    {parryMode === 'SIGIL' && targetSigil && (
-                        <View style={{alignItems: 'center'}}>
-                            <Text style={styles.parryPrompt}>RESONATE!</Text>
-                            <View style={styles.sigilRingContainer}>
-                                <View style={[styles.sigilRingStatic]} />
-                                <View style={[styles.sigilRingDynamic, { transform: [{ scale: 1 - parryTimer/100 }] }]} />
-                                <targetSigil.icon size={40} color="#ef4444" />
-                            </View>
-                            <View style={styles.sigilButtons}>
-                                {Object.values(SIGILS).map((s: any) => (
-                                    <TouchableOpacity key={s.id} onPressIn={() => parryWindowActive && parryPreDelay <= 0 && parryTimer > 55 && parryTimer < 95 && s.id === targetSigil.id ? resolveEnemyAttack(true, "PERFECT") : resolveEnemyAttack(false, "MISS")} style={styles.sigilBtn}>
-                                        <s.icon size={24} color="white" />
-                                    </TouchableOpacity>
-                                ))}
-                            </View>
-                        </View>
-                    )}
-
-                    {parryMode === 'SLIDER' && targetSlider && (
-                        <View style={{alignItems: 'center'}}>
-                            <Text style={styles.parryPrompt}>{parryPreDelay > 0 ? "READY..." : "HOLD & TRACK"}</Text>
-                            <View 
-                                style={styles.sliderBox}
-                                onLayout={(e) => setSliderLayout(e.nativeEvent.layout)}
-                                {...panResponder.panHandlers}
-                            >
-                                <Svg height="100%" width="100%" viewBox="0 0 100 100">
-                                    <Path d={targetSlider.path} stroke="#1e293b" strokeWidth="12" fill="none" strokeLinecap="round" />
-                                    <Path d={targetSlider.path} stroke={isHolding ? "#22d3ee" : "#ef4444"} strokeWidth="4" fill="none" strokeDasharray="1,4" />
-                                    {/* Render Ball */}
-                                    {(() => {
-                                         const pos = getPointOnPath(targetSlider.checkpoints, parryTimer / 100);
-                                         return (
-                                             <>
-                                                <SvgCircle cx={pos.x} cy={pos.y} r="15" stroke={isHolding ? "#22d3ee" : "#ef4444"} strokeWidth="1" strokeDasharray="4,4" fill="none" />
-                                                <SvgCircle cx={pos.x} cy={pos.y} r="6" fill={isHolding ? "#fff" : "#ef4444"} />
-                                             </>
-                                         );
-                                    })()}
-                                    {/* End Target */}
-                                    {(() => {
-                                        const end = getPointOnPath(targetSlider.checkpoints, 1.0);
-                                        return <SvgCircle cx={end.x} cy={end.y} r="6" fill="#ef4444" />;
-                                    })()}
-                                </Svg>
-                            </View>
-                        </View>
-                    )}
-                </View>
-            </View>
-        )}
-
-        {/* --- BOTTOM HUD --- */}
-        <View style={styles.bottomHud}>
-            {/* Planned Sequence */}
-            {isPlayerTurnPhase && plannedAbilities.length > 0 && (
-                <View style={styles.sequenceBar}>
-                    {plannedAbilities.map((item: any, i: number) => (
-                        <View key={i} style={styles.sequenceItem}>
-                            <Text style={styles.sequenceText}>{item.ability.name}</Text>
-                        </View>
-                    ))}
-                </View>
-            )}
-
-            {/* Tactical Readout */}
-            <View style={styles.readout}>
-                {currentAbility ? (
-                    <View>
-                        <View style={{flexDirection:'row', justifyContent:'space-between'}}>
-                            <Text style={styles.readoutTitle}>{currentAbility.name}</Text>
-                            <Text style={styles.readoutType}>{getProjectedDetail(currentAbility)?.type}</Text>
-                        </View>
-                        <Text style={styles.readoutDesc}>{currentAbility.description}</Text>
-                        <View style={styles.readoutFooter}>
-                            <Text style={styles.readoutLabel}>{getProjectedDetail(currentAbility)?.hits} Hits</Text>
-                            <Text style={styles.readoutValue}>{getProjectedDetail(currentAbility)?.final}</Text>
-                        </View>
-                    </View>
-                ) : (
-                    <Text style={styles.logText}>{logs[0]}</Text>
-                )}
-            </View>
-
-            {/* Controls */}
-            <View style={styles.controlsRow}>
-                <TouchableOpacity onPress={switchStance} disabled={!isPlayerTurnPhase} style={[styles.ctrlBtn, { borderColor: stance.color }]}>
-                    <Sword size={16} color={stance.color} />
-                    <Text style={[styles.ctrlText, { color: stance.color }]}>{stance.label}</Text>
-                </TouchableOpacity>
-                
-                <TouchableOpacity onPress={undoLastAction} disabled={!isPlayerTurnPhase} style={[styles.ctrlBtnSmall, { borderColor: '#facc15' }]}>
-                    <RotateCcw size={16} color="#facc15" />
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                    onPress={processPlannedActions}
-                    disabled={!isPlayerTurnPhase || plannedAbilities.length === 0}
-                    activeOpacity={0.7}
-                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                    style={[styles.ctrlBtn, { borderColor: '#4ade80' }, (plannedAbilities.length === 0) && styles.ctrlBtnDisabled]}
-                >
-                    <Play size={16} color={plannedAbilities.length === 0 ? '#555' : '#4ade80'} fill={plannedAbilities.length === 0 ? '#555' : '#4ade80'} />
-                    <Text style={[styles.ctrlText, { color: plannedAbilities.length === 0 ? '#555' : '#4ade80' }]}>EXECUTE</Text>
-                </TouchableOpacity>
-            </View>
-
-            {/* Ability Grid - Compact */}
-            <View style={styles.abilityGrid}>
-                {(isPlayerTurnPhase && activeChar ? activeChar.abilities : []).map((ability: any) => {
-                    const canAfford = activeChar.ap >= ability.cost && activeChar.hp > 0;
-                    const isSelected = selectedAbilityId === ability.id;
-                    return (
-                        <TouchableOpacity 
-                            key={ability.id} 
-                            onPress={() => handleAbilityTap(ability)}
-                            disabled={!canAfford}
-                            style={[
-                                styles.abilityBtn, 
-                                isSelected && styles.abilityBtnSelected,
-                                !canAfford && styles.abilityBtnDisabled
-                            ]}
-                        >
-                            {isSelected && (
-                                <View style={styles.confirmBadge}>
-                                    <Text style={styles.confirmText}>CONFIRM</Text>
-                                </View>
-                            )}
-                            <View>
-                                <Text style={styles.abilityName} numberOfLines={1}>{ability.name}</Text>
-                                <View style={{flexDirection:'row', gap:2, marginTop: 4}}>
-                                    {[...Array(ability.cost)].map((_, i) => <Hexagon key={i} size={6} fill={isSelected ? "#22d3ee" : "#555"} color={isSelected ? "#22d3ee" : "#555"} />)}
-                                </View>
-                            </View>
-                        </TouchableOpacity>
-                    );
-                })}
-                {!isPlayerTurnPhase && <Text style={styles.waitingText}>ENEMY TURN...</Text>}
-            </View>
-        </View>
-
-      </Animated.View>
-    </SafeAreaView>
+                          // Approach Ring Scale
+                          const scaleVal = isActive ? Math.max(1, 2.5 - (Math.max(0, approachProgress) / 25 * 1.5)) : 1;
+                          
+                          return (
+                              <View 
+                                  key={target.id}
+                                  style={[
+                                      styles.qteContainer, 
+                                      { left: `${target.x}%`, top: `${target.y}%` }
+                                  ]}
+                              >
+                                  {/* Approach Ring (Only for initial hit) */}
+                                  {isActive && target.status !== 'active' && (
+                                      <View style={[
+                                          styles.qteRing, 
+                                          { 
+                                              transform: [{ scale: scaleVal }], 
+                                              borderColor: (Math.abs(parryTimer - target.hitTime) < 8) ? '#22d3ee' : '#ef4444',
+                                              opacity: Math.min(1, Math.max(0, approachProgress / 5))
+                                          }
+                                      ]} />
+                                  )}
+                                  
+                                  {/* Main Button */}
+                                  <TouchableOpacity
+                                      activeOpacity={1}
+                                      onPressIn={() => handleQteTap(target.id)}
+                                      disabled={!isActive && !isHit && !isMiss} 
+                                      hitSlop={{ top: 30, bottom: 30, left: 30, right: 30 }}
+                                      style={[
+                                          styles.qteBtn,
+                                          isHit && { backgroundColor: '#22d3ee', borderColor: '#fff', transform: [{scale: 1.1}] },
+                                          isMiss && { backgroundColor: '#ef4444', borderColor: '#fff', opacity: 0.8 },
+                                          target.status === 'active' && { borderColor: '#facc15', backgroundColor: 'rgba(250, 204, 21, 0.3)' }
+                                      ]}
+                                  >
+                                      <View style={[styles.qteInner, target.status === 'active' && { backgroundColor: '#facc15' }]}>
+                                          <Text style={[styles.qteText, target.status === 'active' && { color: 'black' }]}>
+                                              {isHit ? "OK" : (isMiss ? "X" : index + 1)}
+                                          </Text>
+                                      </View>
+                                  </TouchableOpacity>
+                              </View>
+                          );
+                      })}
+                  </View>
+              </View>
+          </View>
+      )}
+    </View>
   );
 }
 
@@ -427,7 +613,7 @@ const styles = StyleSheet.create({
   loadingCentered: { justifyContent: 'center', alignItems: 'center' },
   loadingText: { color: '#22d3ee', marginTop: 10, letterSpacing: 2 },
   gameFrame: { width: '100%', height: '100%', backgroundColor: '#050b14', position: 'relative' },
-  flashOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 100, alignItems: 'center', justifyContent: 'center' },
+  flashOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 1000, alignItems: 'center', justifyContent: 'center' },
   cinematicText: { fontSize: 48, fontStyle: 'italic', fontWeight: '900', color: 'white', textTransform: 'uppercase', textShadowColor: '#22d3ee', textShadowRadius: 20 },
   
   topHud: { flexDirection: 'row', justifyContent: 'space-between', padding: 16, paddingTop: 40, zIndex: 20, position: 'absolute', width: '100%', top: 0 },
@@ -438,6 +624,8 @@ const styles = StyleSheet.create({
   queueImage: { width: '100%', height: '100%', borderRadius: 4 },
   queueAvatarWrapper: { width: '100%', height: '100%', borderRadius: 4, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
   
+  settingsBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(15, 23, 42, 0.6)', borderRadius: 6, borderWidth: 1, borderColor: '#334155' },
+
   battlefield: { flex: 1, justifyContent: 'space-between', alignItems: 'center', paddingTop: 80, paddingBottom: 24 },
   enemyBlock: { alignItems: 'center', marginTop: 4 },
   enemyFigure: { width: 130, height: 130, borderRadius: 65, borderWidth: 0, alignItems: 'center', justifyContent: 'center', overflow: 'hidden', backgroundColor: 'transparent', marginTop: 8 },
@@ -466,16 +654,32 @@ const styles = StyleSheet.create({
   charHpText: { color: '#22d3ee', fontSize: 10, fontWeight: 'bold', marginTop: 2 },
   charBuffBadge: { position: 'absolute', top: 0, right: 0, backgroundColor: 'rgba(250,204,21,0.25)', padding: 4, borderRadius: 4 },
 
-  parryOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, justifyContent: 'center', alignItems: 'center', zIndex: 50 },
-  parryContainer: { width: 300, padding: 20, backgroundColor: 'rgba(0,0,0,0.4)', borderRadius: 16, transform: [{skewX: '-6deg'}], borderColor: 'rgba(255,255,255,0.1)', borderWidth: 1 },
-  parryPrompt: { color: '#22d3ee', fontSize: 24, fontWeight: '900', textAlign: 'center', marginBottom: 20, letterSpacing: 4 },
-  sigilRingContainer: { width: 140, height: 140, justifyContent: 'center', alignItems: 'center', marginBottom: 20 },
-  sigilRingStatic: { position: 'absolute', width: '40%', height: '40%', borderWidth: 4, borderColor: 'rgba(34, 211, 238, 0.3)', borderRadius: 100 },
-  sigilRingDynamic: { position: 'absolute', width: '100%', height: '100%', borderWidth: 4, borderColor: '#22d3ee', borderRadius: 100 },
-  sigilButtons: { flexDirection: 'row', gap: 16 },
-  sigilBtn: { width: 48, height: 48, borderRadius: 24, backgroundColor: 'rgba(255,255,255,0.1)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)' },
+  parryOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 1000 },
+  qteContainer: { position: 'absolute', width: 120, height: 120, marginLeft: -60, marginTop: -60, alignItems: 'center', justifyContent: 'center' },
+  qteBtn: { width: 90, height: 90, borderRadius: 45, backgroundColor: 'rgba(5, 11, 20, 0.8)', borderWidth: 3, borderColor: '#334155', alignItems: 'center', justifyContent: 'center' },
+  qteRing: { position: 'absolute', width: 90, height: 90, borderRadius: 45, borderWidth: 6, opacity: 0.8 },
+  qteInner: { width: 70, height: 70, borderRadius: 35, alignItems: 'center', justifyContent: 'center' },
+  qteText: { color: '#fff', fontWeight: '900', fontSize: 28 },
+
+  parryContainer: { 
+    width: '100%', 
+    height: '100%',
+    alignItems: 'center', 
+    justifyContent: 'center',
+  },
+  parryPrompt: { color: 'white', fontSize: 28, fontWeight: '900', textAlign: 'center', marginBottom: 30, letterSpacing: 6, textShadowColor: 'rgba(0,0,0,0.5)', textShadowRadius: 10 },
+  sigilRingContainer: { width: 180, height: 180, justifyContent: 'center', alignItems: 'center', marginBottom: 30 },
+  sigilRingStatic: { position: 'absolute', width: '40%', height: '40%', borderWidth: 6, borderColor: 'rgba(255, 255, 255, 0.2)', borderRadius: 100 },
+  sigilRingDynamic: { position: 'absolute', width: '100%', height: '100%', borderWidth: 4, borderColor: '#ef4444', borderRadius: 100 },
+  sigilButtons: { flexDirection: 'row', gap: 20 },
+  sigilBtn: { width: 64, height: 64, borderRadius: 32, backgroundColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.4)' },
   
-  sliderBox: { width: 200, height: 200, borderColor: 'rgba(255,255,255,0.1)', borderWidth: 2, backgroundColor: 'rgba(0,0,0,0.4)', borderRadius: 12 },
+  sliderBox: { width: SCREEN_WIDTH * 0.75, height: SCREEN_WIDTH * 0.75 },
+
+  apMeterContainer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, paddingHorizontal: 8, paddingVertical: 6, backgroundColor: 'rgba(34, 211, 238, 0.05)', borderRadius: 6, borderWidth: 1, borderColor: 'rgba(34, 211, 238, 0.1)' },
+  apLabel: { color: '#22d3ee', fontWeight: '900', fontSize: 10, letterSpacing: 1 },
+  apPips: { flexDirection: 'row', gap: 6 },
+  apValue: { color: '#94a3b8', fontSize: 10, fontWeight: 'bold' },
 
   bottomHud: { padding: 12, backgroundColor: 'rgba(5, 11, 20, 0.95)', borderTopWidth: 1, borderColor: '#1e293b' },
   sequenceBar: { flexDirection: 'row', gap: 4, marginBottom: 8 },
