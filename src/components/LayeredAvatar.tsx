@@ -121,13 +121,17 @@ export const LayeredAvatar: React.FC<LayeredAvatarProps> = ({
   const equippedShopSkin = equippedShopSkinItem?.shop_items?.image_url;
 
   // 2. Priority: Equipped Skin > Base Body > User Avatar > Default
-  // Note: user.avatar_url is assumed to be mapped to profilePicture in some contexts, but we use what's on User type
+  // When base_body_silhouette_url + base_body_tint_hex are set, use silhouette as tinted base layer
+  const useTintedSilhouette = !!(user?.base_body_silhouette_url && user?.base_body_tint_hex);
   const baseBodyLayer = equippedShopSkin || user?.base_body_url || user?.avatar_url || user?.profilePicture;
-  
-  // Fallback for base body if it's a local require (handle specific case if needed) or just string URL
-  const baseSource = typeof baseBodyLayer === 'string' && baseBodyLayer.startsWith('http') 
-    ? { uri: baseBodyLayer } 
-    : (baseBodyLayer || require('../../assets/NoobMan.png'));
+  const silhouetteUrl = user?.base_body_silhouette_url;
+  const baseTintHex = user?.base_body_tint_hex;
+
+  const baseSource = useTintedSilhouette && typeof silhouetteUrl === 'string' && silhouetteUrl.startsWith('http')
+    ? { uri: silhouetteUrl }
+    : typeof baseBodyLayer === 'string' && baseBodyLayer.startsWith('http')
+      ? { uri: baseBodyLayer }
+      : (baseBodyLayer || require('../../assets/NoobMan.png'));
 
   // 3. Filter overlays (exclude the equipped skin)
   const overlayLayers = equippedCosmetics
@@ -169,17 +173,31 @@ export const LayeredAvatar: React.FC<LayeredAvatarProps> = ({
           }
         ]}
       >
-        {/* Base Body Layer */}
-        <View style={[StyleSheet.absoluteFill, { zIndex: 5 }]}>
+        {/* Base Body Layer (lowest z-index: silhouette / tint) */}
+        <View style={[StyleSheet.absoluteFill, { zIndex: 0 }]}>
           <Image
             source={baseSource}
-            style={styles.fullSize}
+            style={[
+              styles.fullSize,
+              useTintedSilhouette && baseTintHex ? { tintColor: baseTintHex } : undefined
+            ]}
             resizeMode="cover"
             defaultSource={require('../../assets/NoobMan.png')}
           />
         </View>
 
-        {/* Overlay Layers */}
+        {/* Base body image_url in front of silhouette only (zIndex 1), behind all overlays so outline doesn't show over body slot */}
+        {useTintedSilhouette && equippedShopSkinItem?.shop_items?.image_url && (
+          <View style={[StyleSheet.absoluteFill, { zIndex: 1 }]}>
+            <Image
+              source={{ uri: equippedShopSkinItem.shop_items.image_url }}
+              style={styles.fullSize}
+              resizeMode="cover"
+            />
+          </View>
+        )}
+
+        {/* Overlay Layers (eyes, mouth, hair, face, body) — all above base body outline */}
         {overlayLayers.map((cosmetic: any) => {
             const item = cosmetic.shop_items;
             const dbScale = parseFloat(item.scale || "1");

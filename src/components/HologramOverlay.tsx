@@ -19,10 +19,13 @@ export default function HologramOverlay() {
     const name = user?.name || 'Hunter';
     switch (step) {
       case 'INTRO_HOME': return `Welcome, ${name}. I am your System Guide. Let's initialize your interface.`;
-      case 'TRAINING_CARD': return "This is your Daily Training Log. Complete exercises here to maintain your streak.";
+      case 'TRAINING_CARD': return "This is your Daily Training Log. You can track your progress and set goals here. Let me show you the interface.";
+      case 'TRAINING_LOG_MODAL': return "In this log, you can record your workouts and daily diet. AI-powered analysis features cost more, but staying consistent earns you daily rewards!";
       case 'NAV_SHOP': return "The Item Shop. Purchase gear, potions, and upgrades here.";
       case 'NAV_INVENTORY': return "Your Inventory. Equip items and manage your loot here.";
-      case 'NAV_MAP': return "The World Map. Gates appear in the real world. You must physically walk to them.";
+      case 'NAV_STATS': return "This is your Status Window. Check your stats and manage your Skill Tree here. As you grow stronger, you'll unlock powerful abilities!";
+      case 'NAV_SOCIAL': return "The Social Hub! Join Guilds, prepare for future PvP battles, and vote for the best-dressed Hunter of the month to earn rewards!";
+      case 'NAV_MAP': return "The World Map! This is where your real-world steps turn into progress. Traverse the world to discover cities, meet other Hunters, and challenge monsters in the wild. Every step makes you stronger, earns you legendary loot, and helps you look like a true S-Rank Hunter!";
       default: return "";
     }
   };
@@ -32,7 +35,7 @@ export default function HologramOverlay() {
   const dialogPosition = isTargetLow ? { top: 60 } : { bottom: 120 };
 
   return (
-    <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
+    <View style={[StyleSheet.absoluteFill, { zIndex: 10001 }]} pointerEvents="box-none">
       
       {/* 1. Dark Background Dimmer */}
       <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.7)' }]} pointerEvents="none" />
@@ -55,10 +58,10 @@ export default function HologramOverlay() {
       )}
 
       {/* 3. The Hologram Pet & Text */}
-      <View style={[{ position: 'absolute', left: 20, right: 20, alignItems: 'center', overflow: 'visible' }, dialogPosition]}>
+      <View style={[{ position: 'absolute', left: 40, right: 40, alignItems: 'center', overflow: 'visible' }, dialogPosition]}>
         
         {/* Animated Pet */}
-        <View style={{ transform: [{ scale: 0.6 }], marginBottom: -100, marginTop: -100 }}>
+        <View style={{ transform: [{ scale: 0.5 }], marginBottom: -130, marginTop: -130 }}>
           <SpriteSheetAnimator
             spriteSheet={require('../../assets/pet.png')}
             frameCount={9}
@@ -101,21 +104,21 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#00ffff',
     borderRadius: 8,
-    paddingVertical: 16,
-    paddingHorizontal: 20,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
     width: '100%',
     overflow: 'visible',
   },
   dialogTextWrap: {
-    minHeight: 60,
+    minHeight: 40,
     overflow: 'visible',
-    paddingLeft: 8,
+    paddingLeft: 4,
   },
   dialogText: {
     color: '#00ffff',
     fontFamily: 'monospace',
-    fontSize: 14,
-    lineHeight: 22,
+    fontSize: 12,
+    lineHeight: 18,
     textShadowColor: 'rgba(0, 255, 255, 0.5)',
     textShadowRadius: 4,
     flexShrink: 0,

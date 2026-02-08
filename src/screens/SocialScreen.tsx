@@ -12,6 +12,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 
 import { useAuth } from '@/contexts/AuthContext';
+import { useTutorial } from '@/context/TutorialContext';
 import { useSocialData } from '@/hooks/useSocialData';
 import SocialHub from '@/components/SocialHub';
 import { User } from '@/types/user';
@@ -22,6 +23,7 @@ import { useNotification } from '@/contexts/NotificationContext';
 export const SocialScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
+  const { step, targetRef } = useTutorial();
   const { showNotification } = useNotification();
   const socialData = useSocialData();
   const [selectedAvatar, setSelectedAvatar] = useState<User | null>(null);
@@ -46,7 +48,11 @@ export const SocialScreen: React.FC = () => {
         />
         
         <SafeAreaView style={{ flex: 1, paddingTop: Platform.OS === 'android' ? insets.top : 0 }}>
-          <View style={{ flex: 1 }}>
+          <View 
+            style={{ flex: 1 }}
+            ref={step === 'NAV_SOCIAL' ? targetRef : undefined}
+            collapsable={false}
+          >
             <SocialHub
               user={user}
               {...socialData}

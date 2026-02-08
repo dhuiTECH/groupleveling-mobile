@@ -40,6 +40,16 @@ const HomeScreen: React.FC = () => {
   const [isTrainingLogVisible, setIsTrainingLogVisible] = useState(false);
   const [initialTrainingTab, setInitialTrainingTab] = useState<'training' | 'nutrition'>('training');
 
+  useEffect(() => {
+    if (step === 'TRAINING_LOG_MODAL') {
+      setIsTrainingLogVisible(true);
+    } else if (isTrainingLogVisible && step !== 'TRAINING_LOG_MODAL' && step !== 'IDLE' && step !== 'COMPLETED') {
+      // Close modal if tutorial moves past this step, but only if it was opened by tutorial
+      // Actually, just closing it when step changes is safer for tutorial flow
+      setIsTrainingLogVisible(false);
+    }
+  }, [step]);
+
   const handleOpenTrainingLog = (tab: 'training' | 'nutrition') => {
     setInitialTrainingTab(tab);
     setIsTrainingLogVisible(true);

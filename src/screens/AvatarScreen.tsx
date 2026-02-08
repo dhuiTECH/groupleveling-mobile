@@ -27,6 +27,19 @@ const SLOT_LABELS: Record<string, string> = {
   body: "Body",
 };
 
+const SKIN_TONES = [
+  { hex: "#FFDBAC", label: "Light" },
+  { hex: "#F1C27D", label: "Light warm" },
+  { hex: "#E0AC69", label: "Medium light" },
+  { hex: "#C68642", label: "Tan" },
+  { hex: "#B87333", label: "Filipino brown" },
+  { hex: "#A0522D", label: "Brown" },
+  { hex: "#8D5524", label: "Light skin Black" },
+  { hex: "#5C3317", label: "Dark brown" },
+  { hex: "#3D2314", label: "Dark skin" },
+  { hex: "#2C1810", label: "Black" },
+];
+
 export default function AvatarScreen({ navigation }: any) {
   const { user } = useAuth();
   // State
@@ -36,7 +49,8 @@ export default function AvatarScreen({ navigation }: any) {
   const [activeCategory, setActiveCategory] = useState<string>("base");
   const [selectedBaseIndex, setSelectedBaseIndex] = useState(0);
   const [selectedPartIndex, setSelectedPartIndex] = useState<Record<string, number>>({});
-  
+  const [skinTint, setSkinTint] = useState("#FFDBAC");
+
   // Animation Values
   const spinValue = useRef(new Animated.Value(0)).current;
   const impactScale = useRef(new Animated.Value(1)).current;
@@ -165,6 +179,9 @@ export default function AvatarScreen({ navigation }: any) {
         
         setApiBases(bases);
         setApiParts(parts);
+        if (bases.length > 0 && bases[0].skin_tint_hex) {
+          setSkinTint(bases[0].skin_tint_hex);
+        }
       }
       setLoading(false);
     }
@@ -221,22 +238,28 @@ export default function AvatarScreen({ navigation }: any) {
   }, [selectedBaseIndex]);
 
   const handleSelect = (index: number) => {
-    // Play sound explicitly here
     triggerSelectionFeedback();
-    
     if (activeCategory === "base") {
-        setSelectedBaseIndex(index);
+      setSelectedBaseIndex(index);
+      const newBase = apiBases[index];
+      if (newBase?.skin_tint_hex) {
+        setSkinTint(newBase.skin_tint_hex);
+      }
     } else {
-        setSelectedPartIndex(prev => ({ ...prev, [activeCategory]: index }));
+      setSelectedPartIndex(prev => ({ ...prev, [activeCategory]: index }));
     }
   };
 
+  const handleSkinSelect = (hex: string) => {
+    setSkinTint(hex);
+    Haptics.selectionAsync();
+  };
+
   const syntheticUser = useMemo(() => {
-    // Fallback to a valid image URL if base is missing
     const baseImage = selectedBase?.image_url;
+    const baseSilhouette = selectedBase?.image_base_url;
     const cosmetics = [];
 
-    // Add base body to cosmetics if it exists
     if (selectedBase?.id) {
       cosmetics.push({
         id: `preview-base`,
@@ -244,11 +267,9 @@ export default function AvatarScreen({ navigation }: any) {
         shop_items: selectedBase
       });
     }
-    
     for (const slot of PART_SLOTS) {
       const idx = selectedPartIndex[slot] ?? 0;
       const item = partsBySlot[slot]?.[idx];
-      // Only add if it's a real item (id is not null)
       if (item?.id) {
         cosmetics.push({
           id: `preview-${slot}`,
@@ -259,13 +280,13 @@ export default function AvatarScreen({ navigation }: any) {
     }
 
     return {
-      // Basic user fields required by your User type
       id: 'preview-user',
       name: 'Hunter',
-      avatar_url: baseImage, // Deprecated but used as fallback
+      avatar_url: baseImage,
       base_body_url: baseImage,
-      cosmetics: cosmetics as any, // Cast to any to bypass strict type check for synthetic user
-      // Required fields for User type
+      base_body_silhouette_url: baseSilhouette,
+      base_body_tint_hex: skinTint,
+      cosmetics: cosmetics as any,
       email: '',
       level: 1,
       exp: 0,
@@ -283,13 +304,15 @@ export default function AvatarScreen({ navigation }: any) {
       current_mp: 50,
       max_mp: 50,
     } as User;
-  }, [selectedBase, selectedPartIndex, partsBySlot]);
+  }, [selectedBase, selectedPartIndex, partsBySlot, skinTint]);
 
   const handleFinalize = async () => {
     await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    // Navigate to Class Selection and pass the configured avatar data
-    navigation.navigate('ClassSelection', { 
-      avatarConfig: syntheticUser 
+    navigation.navigate('ClassSelection', {
+      avatarConfig: {
+        ...syntheticUser,
+        base_body_tint_hex: skinTint,
+      }
     });
   };
 
@@ -375,6 +398,29 @@ export default function AvatarScreen({ navigation }: any) {
 
           {/* Bottom Controls: Categories, Options, Finalize */}
           <View>
+            {/* Skin Tone Selector (only when Base tab is active) */}
+            {activeCategory === 'base' && (
+              <View style={{ paddingHorizontal: 20, paddingVertical: 12, marginBottom: 15 }}>
+                <Text style={styles.sectionLabel}>SKIN TONE RECALIBRATION</Text>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={{ gap: 8, paddingHorizontal: 16, paddingVertical: 10, alignItems: 'center' }}
+                >
+                  {SKIN_TONES.map((tone) => (
+                    <TouchableOpacity
+                      key={tone.hex}
+                      onPress={() => handleSkinSelect(tone.hex)}
+                      style={[
+                        styles.colorCircle,
+                        { backgroundColor: tone.hex },
+                        skinTint === tone.hex && styles.colorCircleActive
+                      ]}
+                    />
+                  ))}
+                </ScrollView>
+              </View>
+            )}
             {/* Category Tabs */}
             <View className="px-3 py-4 mt-2">
               <View className="flex-row justify-center gap-4" style={{ marginBottom: 20 }}>
@@ -454,34 +500,14 @@ export default function AvatarScreen({ navigation }: any) {
                 </ScrollView>
             </View>
 
-            {/* Footer / Finalize (Matches ClassSelection style exactly) */}
-            <View style={{ alignItems: 'center', paddingTop: 10, paddingBottom: 30 }}> 
+            {/* Footer / Finalize */}
+            <View style={{ alignItems: 'center', paddingTop: 10, paddingBottom: 30 }}>
               <TouchableOpacity
                 onPress={handleFinalize}
                 activeOpacity={0.85}
-                style={{
-                  width: '90%',
-                  backgroundColor: 'rgba(0,0,0,0.8)',
-                  borderWidth: 1,
-                  borderColor: '#22d3ee',
-                  paddingVertical: 15,
-                  borderRadius: 2,
-                  alignItems: 'center',
-                  flexDirection: 'row',
-                  justifyContent: 'center',
-                  gap: 10,
-                }}
+                style={styles.finalizeBtn}
               >
-                <Text
-                  style={{
-                    color: '#fff',
-                    fontSize: 14,
-                    fontWeight: '900',
-                    letterSpacing: 3,
-                  }}
-                >
-                  CLASS SELECTION
-                </Text>
+                <Text style={styles.finalizeText}>CLASS SELECTION</Text>
                 <ChevronRight size={16} color="#fff" />
               </TouchableOpacity>
             </View>
@@ -591,5 +617,43 @@ const styles = StyleSheet.create({
     fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
     fontWeight: 'bold',
     textTransform: 'uppercase',
-  }
+  },
+  sectionLabel: {
+    color: '#06b6d4',
+    fontSize: 10,
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+    fontWeight: 'bold',
+    marginBottom: 8,
+    letterSpacing: 1,
+  },
+  colorCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
+  },
+  colorCircleActive: {
+    borderWidth: 2,
+    borderColor: '#fff',
+    transform: [{ scale: 1.1 }],
+  },
+  finalizeBtn: {
+    width: '90%',
+    backgroundColor: 'rgba(0,0,0,0.8)',
+    borderWidth: 1,
+    borderColor: '#22d3ee',
+    paddingVertical: 15,
+    borderRadius: 2,
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 10,
+  },
+  finalizeText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '900',
+    letterSpacing: 3,
+  },
 });

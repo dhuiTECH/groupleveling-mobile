@@ -134,6 +134,8 @@ export function AuthProvider({ children }: AuthProviderProps): JSX.Element {
               unassigned_stat_points: profile.unassigned_stat_points,
               skill_loadout: profile.skill_loadout,
               last_reset: profile.last_reset,
+              base_body_silhouette_url: profile.base_body_silhouette_url,
+              base_body_tint_hex: profile.base_body_tint_hex,
             } as User);
           }
         } catch (err) {
@@ -208,6 +210,8 @@ export function AuthProvider({ children }: AuthProviderProps): JSX.Element {
                 unassigned_stat_points: profile.unassigned_stat_points,
                 skill_loadout: profile.skill_loadout,
                 last_reset: profile.last_reset,
+                base_body_silhouette_url: profile.base_body_silhouette_url,
+                base_body_tint_hex: profile.base_body_tint_hex,
               } as User);
              }
           } catch (err) {
@@ -297,12 +301,12 @@ export function AuthProvider({ children }: AuthProviderProps): JSX.Element {
   };
 
   const checkProfileExists = async (identifier: string): Promise<any> => {
-    // Check by email or hunter_name
+    // Use maybeSingle() so "no row" is not an error (single() returns 406 when 0 rows)
     const { data: profileByEmail } = await supabase
       .from('profiles')
       .select('*')
       .eq('email', identifier)
-      .single();
+      .maybeSingle();
 
     if (profileByEmail) return profileByEmail;
 
@@ -310,7 +314,7 @@ export function AuthProvider({ children }: AuthProviderProps): JSX.Element {
       .from('profiles')
       .select('*')
       .eq('hunter_name', identifier)
-      .single();
+      .maybeSingle();
 
     return profileByName;
   };

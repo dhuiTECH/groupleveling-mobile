@@ -58,7 +58,7 @@ export default function SignupScreen() {
           if (data.gender === 'Female') avatarUrl = 'NoobWoman.png';
           else if (data.gender === 'Non-binary') avatarUrl = 'Noobnonbinary.png';
 
-          await supabase.from('profiles').upsert({
+          const { error: profileError } = await supabase.from('profiles').upsert({
             id: session.user.id,
             hunter_name: data.name,
             email: data.email,
@@ -67,6 +67,14 @@ export default function SignupScreen() {
             onboarding_completed: false, // Not yet completed
             updated_at: new Date().toISOString(),
           });
+
+          if (profileError) {
+            console.error('Profile upsert error (verify step):', profileError);
+            const msg = (profileError as { code?: string }).code === '23505'
+              ? 'This hunter name or email is already in use.'
+              : (profileError.message || 'Database error saving new user.');
+            throw new Error(msg);
+          }
       }
 
       playHunterSound('loginSuccess');
@@ -115,7 +123,13 @@ export default function SignupScreen() {
           .from('profiles')
           .upsert(updates);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Profile upsert error (class awaken):', error);
+        const msg = (error as { code?: string }).code === '23505'
+          ? 'This hunter name or email is already in use.'
+          : (error.message || 'Database error saving new user.');
+        throw new Error(msg);
+      }
 
       // Update local user context
       if (user) {
@@ -146,7 +160,8 @@ export default function SignupScreen() {
       return { success: true };
     } catch (e: any) {
       console.error('Awakening error:', e);
-      return { success: false, error: e.message || 'Failed to finalize awakening.' };
+      const message = e?.message || 'Failed to finalize awakening.';
+      return { success: false, error: message };
     }
   };
 

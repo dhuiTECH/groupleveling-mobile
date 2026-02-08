@@ -16,6 +16,8 @@ import DeployMissionForm from './DeployMissionForm';
 import AddFoodForm from './AddFoodForm';
 import WeeklyFeedbackModal from './WeeklyFeedbackModal';
 import HologramPet from '@/components/HologramPet';
+import HologramOverlay from '../HologramOverlay';
+import { useTutorial } from '@/context/TutorialContext';
 
 interface TrainingLogModalProps {
   isOpen: boolean;
@@ -39,6 +41,7 @@ export default function TrainingLogModal({
   setUser
 }: TrainingLogModalProps) {
   const { showNotification } = useNotification();
+  const { step } = useTutorial();
   // State
   const [activeTab, setActiveTab] = useState<'training' | 'nutrition'>(initialTab);
   const [selectedJournalDay, setSelectedJournalDay] = useState<string>('Monday');
@@ -717,6 +720,8 @@ export default function TrainingLogModal({
                 visible={showFeedbackModal} 
                 onConfirm={handleWeeklyReset} 
             />
+
+            {step === 'TRAINING_LOG_MODAL' && <HologramOverlay />}
 
         </View>
       </BlurView>

@@ -174,25 +174,28 @@ const ClassSelectionScreen = () => {
         // 🎯 1. GET THE CORRECT STARTING TITLE
         const startingTitle = INITIAL_TITLES[selectedClass] || 'Novice Hunter';
 
-        // 🎯 2. UPSERT WITH TITLE & RANK 0
+        // 🎯 2. UPSERT WITH TITLE & RANK 0 (include avatar tint/silhouette from Avatar screen)
         const { error } = await supabase
             .from('profiles')
             .upsert({
                 id: userId,
                 hunter_name: name || user?.name || 'Hunter', 
                 email: user?.email,
-                
+
                 // Class & Title Logic
                 current_class: selectedClass,
                 current_title: startingTitle,
-                rank_tier: 0, 
+                rank_tier: 0,
 
                 gender: gender || 'Male',
                 avatar: avatarUrl,
                 level: 1,
-                coins: 100, 
+                coins: 100,
                 onboarding_completed: true,
                 updated_at: new Date().toISOString(),
+
+                base_body_silhouette_url: avatarConfig?.base_body_silhouette_url ?? user?.base_body_silhouette_url ?? null,
+                base_body_tint_hex: avatarConfig?.base_body_tint_hex ?? user?.base_body_tint_hex ?? null,
             });
 
         if (error) throw error;
@@ -238,9 +241,11 @@ const ClassSelectionScreen = () => {
                         onboarding_completed: true,
                         gender: gender || user.gender || 'Male',
                         name: name || user.name || 'Hunter',
-                        avatar: avatarUrl, 
+                        avatar: avatarUrl,
                         profilePicture: resolveAvatar(avatarUrl),
-                        cosmetics: avatarConfig?.cosmetics || user.cosmetics || []
+                        cosmetics: avatarConfig?.cosmetics || user.cosmetics || [],
+                        base_body_silhouette_url: avatarConfig?.base_body_silhouette_url ?? user.base_body_silhouette_url,
+                        base_body_tint_hex: avatarConfig?.base_body_tint_hex ?? user.base_body_tint_hex,
                     });
                 }
                 navigation.reset({ index: 0, routes: [{ name: 'Home' }] });

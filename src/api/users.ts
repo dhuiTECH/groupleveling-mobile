@@ -77,6 +77,8 @@ export const api = {
         gender: profile.gender,
         onboarding_completed: profile.onboarding_completed,
         base_body_url: profile.base_body_url,
+        base_body_silhouette_url: profile.base_body_silhouette_url,
+        base_body_tint_hex: profile.base_body_tint_hex,
         avatar_url: profile.avatar,
         is_private: profile.is_private,
         manual_daily_completions: profile.manual_daily_completions,

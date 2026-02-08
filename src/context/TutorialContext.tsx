@@ -8,8 +8,11 @@ export type TutorialStep =
   | 'IDLE'            
   | 'INTRO_HOME'      
   | 'TRAINING_CARD'   
+  | 'TRAINING_LOG_MODAL'
   | 'NAV_SHOP'        
   | 'NAV_INVENTORY'   
+  | 'NAV_STATS'
+  | 'NAV_SOCIAL'
   | 'NAV_MAP'         
   | 'COMPLETED';
 
@@ -77,8 +80,11 @@ export const TutorialProvider = ({ children }: { children: React.ReactNode }) =>
         if (step === 'NAV_SHOP') {
           navigationRef.navigate('Home', { screen: 'Shop' } as never);
         }
-        if (step === 'NAV_INVENTORY') {
+        if (step === 'NAV_INVENTORY' || step === 'NAV_STATS') {
           navigationRef.navigate('Home', { screen: 'Hunter' } as never); // 'Hunter' is Inventory screen
+        }
+        if (step === 'NAV_SOCIAL') {
+          navigationRef.navigate('Home', { screen: 'Social' } as never);
         }
         if (step === 'NAV_MAP') {
           // WorldMap is in the Tab Navigator (Home -> WorldMap) AND in the Stack (WorldMap)
@@ -106,9 +112,12 @@ export const TutorialProvider = ({ children }: { children: React.ReactNode }) =>
     setPosition(null); // Clear highlight during transition
     
     if (step === 'INTRO_HOME') setStep('TRAINING_CARD');
-    else if (step === 'TRAINING_CARD') setStep('NAV_SHOP');
+    else if (step === 'TRAINING_CARD') setStep('TRAINING_LOG_MODAL');
+    else if (step === 'TRAINING_LOG_MODAL') setStep('NAV_SHOP');
     else if (step === 'NAV_SHOP') setStep('NAV_INVENTORY');
-    else if (step === 'NAV_INVENTORY') setStep('NAV_MAP');
+    else if (step === 'NAV_INVENTORY') setStep('NAV_STATS');
+    else if (step === 'NAV_STATS') setStep('NAV_SOCIAL');
+    else if (step === 'NAV_SOCIAL') setStep('NAV_MAP');
     else if (step === 'NAV_MAP') {
       setStep('COMPLETED');
       if (user?.id) {
