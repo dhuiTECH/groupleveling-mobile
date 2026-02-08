@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
+import * as Haptics from 'expo-haptics';
 import { Animated, Vibration, Alert } from 'react-native';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
-import { Circle, Triangle, X } from 'lucide-react-native';
-import { useSkills } from '@/hooks/useSkills'; // Import the new hook
+import { useSkills } from '@/hooks/useSkills';
 
 // --- Constants & Types ---
 
@@ -41,34 +41,34 @@ export const STANCE = {
   }
 };
 
-export const SIGILS = {
-  CIRCLE: { id: 'circle', icon: Circle, label: 'CIRCLE' },
-  TRIANGLE: { id: 'triangle', icon: Triangle, label: 'TRIANGLE' },
-  CROSS: { id: 'cross', icon: X, label: 'CROSS' }
-};
-
-export const SLIDER_PATHS = {
-  ZIGZAG: { id: 'zigzag', path: "M 20 20 L 80 20 L 20 80 L 80 80", checkpoints: [{x:20, y:20}, {x:80, y:20}, {x:20, y:80}, {x:80, y:80}] },
-  S_CURVE: { id: 'scurve', path: "M 50 10 C 90 10 90 50 50 50 C 10 50 10 90 50 90", checkpoints: [{x:50, y:10}, {x:85, y:25}, {x:50, y:50}, {x:15, y:75}, {x:50, y:90}] },
-  V_SHAPE: { id: 'vshape', path: "M 10 10 L 50 90 L 90 10", checkpoints: [{x:10, y:10}, {x:50, y:90}, {x:90, y:10}] }
-};
-
-const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
-
-export const getPointOnPath = (checkpoints: {x: number, y: number}[], t: number) => {
-    if (t <= 0) return checkpoints[0];
-    if (t >= 1) return checkpoints[checkpoints.length - 1];
-    const segmentCount = checkpoints.length - 1;
-    const scaledT = t * segmentCount;
-    const index = Math.floor(scaledT);
-    const localT = scaledT - index;
-    const p1 = checkpoints[index];
-    const p2 = checkpoints[index + 1];
-    return { x: lerp(p1.x, p2.x, localT), y: lerp(p1.y, p2.y, localT) };
-};
-
 const generateTurns = (count = 50) => {
-    return Array.from({ length: count }, () => Math.random() > 0.6 ? ACTOR_TYPE.ENEMY : ACTOR_TYPE.PLAYER);
+    const turns = [];
+    let playerStreak = 0;
+    let enemyStreak = 0;
+
+    // Guaranteed Player Start
+    turns.push(ACTOR_TYPE.PLAYER);
+    playerStreak = 1;
+
+    for (let i = 1; i < count; i++) {
+        // 60% base chance for Player
+        let isPlayer = Math.random() <= 0.6;
+
+        // Hard Constraints
+        if (playerStreak >= 3) isPlayer = false; // Cap Player streak at 3
+        if (enemyStreak >= 2) isPlayer = true;   // Cap Enemy streak at 2
+
+        if (isPlayer) {
+            turns.push(ACTOR_TYPE.PLAYER);
+            playerStreak++;
+            enemyStreak = 0;
+        } else {
+            turns.push(ACTOR_TYPE.ENEMY);
+            enemyStreak++;
+            playerStreak = 0;
+        }
+    }
+    return turns;
 };
 
 export const useBattleLogic = ({ encounterId, raidId, isBoss }: { encounterId?: string, raidId?: string, isBoss?: boolean }) => {
@@ -99,19 +99,18 @@ export const useBattleLogic = ({ encounterId, raidId, isBoss }: { encounterId?: 
   const [parryTimer, setParryTimer] = useState(0);
   const [parryPreDelay, setParryPreDelay] = useState(0);
   const [parryWindowActive, setParryWindowActive] = useState(false);
-  const [parryMode, setParryMode] = useState<'SIGIL' | 'SLIDER'>('SIGIL');
-  const [targetSigil, setTargetSigil] = useState<any>(null);
-  const [targetSlider, setTargetSlider] = useState<any>(null);
+  const [qteTargets, setQteTargets] = useState<any[]>([]);
+  const [qteStats, setQteStats] = useState({ hits: 0, misses: 0 });
   
   // FX State
   const [successFlash, setSuccessFlash] = useState(false);
   const [failFlash, setFailFlash] = useState(false);
-  const [isHolding, setIsHolding] = useState(false);
-  const [sliderSync, setSliderSync] = useState(true);
+  const [lastDamageEvent, setLastDamageEvent] = useState<{ targetId: string, value: number, type: 'damage' | 'heal', timestamp: number } | null>(null);
   
   // Animations
   const shakeAnim = useRef(new Animated.Value(0)).current;
   const isProcessingActionsRef = useRef(false);
+  const attackResolvedRef = useRef(false);
 
   // Constants
   const activeChar = party[activeIndex];
@@ -120,6 +119,14 @@ export const useBattleLogic = ({ encounterId, raidId, isBoss }: { encounterId?: 
   const currentAbility = activeChar?.abilities.find((a: any) => a.id === selectedAbilityId);
   const basicAbility = activeChar?.abilities?.find((a: any) => a.id.endsWith('_basic') || a.id === 'generic_attack') ?? activeChar?.abilities?.[0];
 
+  const parryTimerRef = useRef(0);
+  const qteTargetsRef = useRef<any[]>([]);
+
+  // Keep ref in sync with state
+  useEffect(() => {
+      qteTargetsRef.current = qteTargets;
+  }, [qteTargets]);
+
   // --- Initialization ---
   useEffect(() => {
     // Wait for loadout to be populated or confirmed empty before initializing
@@ -127,6 +134,13 @@ export const useBattleLogic = ({ encounterId, raidId, isBoss }: { encounterId?: 
     
     const initBattle = async () => {
       setLoading(true);
+      setCurrentPhase(PHASE.ACTIVE);
+      setQueueIndex(0);
+      setLogs(['BATTLE START']);
+      setPlannedAbilities([]);
+      setChainCount(0);
+      setSelectedAbilityId(null);
+      
       try {
         // 1. Fetch Player Data & Skills (always includes Basic Attack from useSkills)
         let playerAbilities = getBattleSkills();
@@ -146,11 +160,13 @@ export const useBattleLogic = ({ encounterId, raidId, isBoss }: { encounterId?: 
             }];
         }
 
+        const initialHP = user?.current_hp && user.current_hp > 0 ? user.current_hp : (user?.max_hp || 100);
+
         const playerChar = {
             id: user?.id || 'player',
             name: user?.name || 'Hunter',
-            hp: user?.current_hp ?? (user?.max_hp || 100),
-            maxHP: user?.max_hp ?? 100,
+            hp: initialHP,
+            maxHP: user?.max_hp || 100,
             ap: 3,
             maxAP: 3,
             abilities: playerAbilities,
@@ -286,6 +302,10 @@ export const useBattleLogic = ({ encounterId, raidId, isBoss }: { encounterId?: 
       setParty(workingParty);
       setEnemy(workingEnemy);
 
+      if (totalDmg > 0) {
+          setLastDamageEvent({ targetId: 'ENEMY', value: totalDmg, type: 'damage', timestamp: Date.now() });
+      }
+
       if (workingEnemy.hp <= 0) {
         setCurrentPhase(PHASE.VICTORY);
         isProcessingActionsRef.current = false;
@@ -335,7 +355,35 @@ export const useBattleLogic = ({ encounterId, raidId, isBoss }: { encounterId?: 
     }
   };
 
+  const handleQteTap = (targetId: string) => {
+      const target = qteTargets.find(t => t.id === targetId);
+      if (!target || target.status !== 'pending') return;
+      
+      const diff = Math.abs(parryTimer - target.hitTime);
+      
+      // Tap Logic
+      if (diff <= 10) {
+          setQteTargets(prev => prev.map(t => t.id === targetId ? { ...t, status: 'hit' } : t));
+          setQteStats(prev => ({ ...prev, hits: prev.hits + 1 }));
+          setSuccessFlash(true);
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); // Haptic on Hit
+          setTimeout(() => setSuccessFlash(false), 300);
+      } else {
+          setQteTargets(prev => prev.map(t => t.id === targetId ? { ...t, status: 'miss' } : t));
+          setQteStats(prev => ({ ...prev, misses: prev.misses + 1 }));
+          setFailFlash(true);
+          triggerShake();
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error); // Haptic on Miss
+          setTimeout(() => setFailFlash(false), 300);
+          resolveEnemyAttack(false, "FAILED");
+      }
+  };
+
   const resolveEnemyAttack = (isParry: boolean, msg: string) => {
+    if (attackResolvedRef.current) return;
+    attackResolvedRef.current = true;
+    setParryWindowActive(false);
+    // ... rest of function
     if (isParry) {
         setSuccessFlash(true);
         setTimeout(() => setSuccessFlash(false), 800);
@@ -344,13 +392,30 @@ export const useBattleLogic = ({ encounterId, raidId, isBoss }: { encounterId?: 
         triggerShake();
         setTimeout(() => setFailFlash(false), 800);
     }
-    const dmg = isParry ? 0 : 800; // Fixed dmg for now
+    const dmg = isParry ? 0 : Math.max(0, 800 - (qteStats.hits * 200)); // Reduce dmg by hits
     const nextParty = party.map(p => p.id === enemyTargetId ? { ...p, hp: Math.max(0, p.hp - dmg) } : p);
-    setParty(nextParty);
-    addLog(`${msg}`);
+    
+    if (dmg > 0 && enemyTargetId) {
+        setLastDamageEvent({ targetId: enemyTargetId, value: dmg, type: 'damage', timestamp: Date.now() });
+    }
+
+    // For QTE, show summary
+    if (!isParry) { // 'isParry' is false when called from timeout
+        if (qteStats.hits === qteTargets.length) {
+            setSuccessFlash(true);
+            setTimeout(() => setSuccessFlash(false), 800);
+            addLog(`PERFECT SEQUENCE!`);
+        } else {
+            addLog(`HIT: ${qteStats.hits} / MISS: ${qteStats.misses}`);
+        }
+    } else {
+        addLog(`${msg}`);
+    }
 
     if (nextParty.every(p => p.hp <= 0)) {
-        setCurrentPhase(PHASE.DEFEAT);
+        setTimeout(() => {
+            setCurrentPhase(PHASE.DEFEAT);
+        }, 1000);
         return;
     }
 
@@ -361,20 +426,41 @@ export const useBattleLogic = ({ encounterId, raidId, isBoss }: { encounterId?: 
   };
 
   const startEnemyAttack = () => {
+    attackResolvedRef.current = false;
     setCurrentPhase(PHASE.ENEMY_STRIKE);
     setParryTimer(0);
+    parryTimerRef.current = 0; // Reset ref
     setParryWindowActive(true);
-    setIsHolding(false);
-    setSliderSync(true);
-    if (Math.random() < 0.5) {
-        setParryMode('SIGIL');
-        setParryPreDelay(0.5); 
-        setTargetSigil(SIGILS[Object.keys(SIGILS)[Math.floor(Math.random() * 3)] as keyof typeof SIGILS]);
-    } else {
-        setParryMode('SLIDER');
-        setParryPreDelay(1.2); 
-        setTargetSlider(Object.values(SLIDER_PATHS)[Math.floor(Math.random() * 3)]);
+    setParryPreDelay(0.5);
+    
+    // Generate 3-5 targets, mix of taps and sliders
+    const count = 3 + Math.floor(Math.random() * 3);
+    const newTargets = [];
+    let lastTime = 15;
+    
+    for(let i=0; i<count; i++) {
+        const isSlider = false; // Slider removed
+        const duration = 0;
+        // Increase gap to ensure no overlap (Approach is 25, so gap > 25 keeps them separate)
+        const startTime = lastTime + 30 + Math.random() * 10;
+        
+        newTargets.push({
+            id: `t-${Date.now()}-${i}`,
+            type: 'tap',
+            // Constrain to lower 60% of screen for thumb accessibility
+            x: 20 + Math.random() * 60,
+            y: 40 + Math.random() * 40, 
+            toX: undefined,
+            toY: undefined,
+            hitTime: startTime,
+            duration: duration,
+            status: 'pending'
+        });
+        
+        lastTime = startTime + duration;
     }
+    setQteTargets(newTargets);
+    setQteStats({ hits: 0, misses: 0 });
   };
 
   const startEnemyTurn = () => {
@@ -383,7 +469,7 @@ export const useBattleLogic = ({ encounterId, raidId, isBoss }: { encounterId?: 
     const target = living[Math.floor(Math.random() * living.length)];
     if (target) {
         setEnemyTargetId(target.id);
-        setTimeout(() => startEnemyAttack(), 1500);
+        setTimeout(() => startEnemyAttack(), 800);
     } else {
         setQueueIndex(prev => prev + 1);
         startPlayerTurn();
@@ -408,32 +494,71 @@ export const useBattleLogic = ({ encounterId, raidId, isBoss }: { encounterId?: 
             if (parryPreDelay > 0) {
                 setParryPreDelay(prev => prev - deltaTime);
             } else {
-                const speed = parryMode === 'SIGIL' ? 85 : 60;
-                setParryTimer(prev => {
-                   const next = prev + (deltaTime * speed); 
-                   if (parryMode === 'SLIDER') {
-                       if (next > 2 && next < 95) {
-                           if (!isHolding || !sliderSync) { 
-                               setParryWindowActive(false); 
-                               resolveEnemyAttack(false, "BROKEN"); 
-                               return 0; 
-                           }
-                       } else if (next >= 95) { 
-                           setParryWindowActive(false); 
-                           resolveEnemyAttack(true, "PERFECT"); 
-                           return 0; 
-                       }
-                   }
-                   if (next >= 100) { resolveEnemyAttack(false, "EXPIRED"); return 0; }
-                   return next;
+                const speed = 45; // Faster for QTE sequence (Harder)
+                
+                // Update Timer
+                parryTimerRef.current += deltaTime * speed;
+                const nextTimer = parryTimerRef.current;
+                setParryTimer(nextTimer);
+
+                // Check for expired targets & update active sliders
+                // Use ref to avoid dependency issues/stale closures
+                const currentTargets = qteTargetsRef.current;
+                let hasChanges = false;
+                let newMisses = 0;
+                let newHits = 0;
+                
+                const updated = currentTargets.map(t => {
+                    // Check for pending expire
+                    if (t.status === 'pending' && nextTimer > t.hitTime + 10) {
+                        hasChanges = true;
+                        newMisses++;
+                        return { ...t, status: 'miss' };
+                    }
+                    
+                    return t;
                 });
+
+                if (hasChanges) {
+                    setQteTargets(updated);
+                    if (newMisses > 0 || newHits > 0) {
+                        setQteStats(prev => ({
+                            hits: prev.hits + newHits,
+                            misses: prev.misses + newMisses
+                        }));
+                    }
+                    
+                    if (newMisses > 0) {
+                        resolveEnemyAttack(false, "FAILED");
+                        parryTimerRef.current = 0;
+                        return;
+                    }
+
+                    if (newHits > 0) {
+                        setSuccessFlash(true);
+                        setTimeout(() => setSuccessFlash(false), 300);
+                    }
+                }
+                
+                // Check completion
+                const lastTarget = currentTargets[currentTargets.length - 1];
+                const sequenceEndTime = lastTarget ? (lastTarget.hitTime + (lastTarget.duration || 0) + 15) : 100;
+
+                if (nextTimer >= sequenceEndTime) {
+                    const finalTargets = hasChanges ? updated : currentTargets;
+                    const success = finalTargets.length > 0 && finalTargets.every(t => t.status === 'hit');
+                    
+                    resolveEnemyAttack(success, success ? "PERFECT SEQUENCE!" : "SEQUENCE COMPLETE");
+                    parryTimerRef.current = 0;
+                    return;
+                }
             }
         }
         animationFrameId = requestAnimationFrame(loop);
     };
     loop();
     return () => cancelAnimationFrame(animationFrameId);
-  }, [currentPhase, parryMode, isHolding, sliderSync, parryWindowActive, parryPreDelay, stanceLevel]);
+  }, [currentPhase, parryWindowActive, parryPreDelay, stanceLevel]);
 
   // Turn Trigger
   useEffect(() => {
@@ -477,15 +602,11 @@ export const useBattleLogic = ({ encounterId, raidId, isBoss }: { encounterId?: 
     plannedAbilities,
     selectedAbilityId,
     enemyTargetId,
-    parryMode,
-    targetSigil,
-    targetSlider,
+    qteTargets,
+    handleQteTap,
     parryTimer,
     parryPreDelay,
     parryWindowActive,
-    isHolding,
-    setIsHolding,
-    setSliderSync,
     successFlash,
     failFlash,
     shakeAnim,
@@ -499,5 +620,6 @@ export const useBattleLogic = ({ encounterId, raidId, isBoss }: { encounterId?: 
     resolveEnemyAttack,
     getProjectedDetail,
     basicAbility,
+    lastDamageEvent,
   };
 };
