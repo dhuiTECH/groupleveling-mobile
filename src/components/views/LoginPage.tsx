@@ -374,7 +374,7 @@ export default function LoginPage({
                           placeholderTextColor="rgba(34, 211, 238, 0.2)"
                           keyboardType="number-pad"
                           maxLength={6}
-                          style={[styles.otpInput, { fontWeight: otpToken ? '900' : '400' }]}
+                          style={styles.otpInput}
                         />
                       </View>
                     </View>
@@ -489,7 +489,7 @@ const styles = StyleSheet.create({
   },
   otpInput: {
     textAlign: 'center', color: '#fff', fontSize: 24, 
-    fontWeight: '900', letterSpacing: 8
+    fontWeight: '400', letterSpacing: 8
   },
 
   // WELCOME BOX

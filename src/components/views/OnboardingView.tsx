@@ -447,7 +447,7 @@ export default function OnboardingView({
                     <Text style={styles.verifyDesc}>Enter the 6-digit key sent to your communication device.</Text>
 
                     <TextInput
-                      style={[styles.otpInput, { width: 321, alignSelf: 'center', fontWeight: otp ? '900' : '400' }]}
+                      style={[styles.otpInput, { width: 321, alignSelf: 'center' }]}
                       value={otp}
                       onChangeText={setOtp}
                       placeholder="000000"
@@ -750,7 +750,7 @@ const styles = StyleSheet.create({
   verifyDesc: { color: '#94a3b8', fontSize: 10, textAlign: 'center', marginBottom: 24 },
   otpInput: {
     width: '100%', borderBottomWidth: 2, borderBottomColor: '#3b82f6',
-    textAlign: 'center', fontSize: 32, fontWeight: '900', color: '#fff',
+    textAlign: 'center', fontSize: 32, fontWeight: '400', color: '#fff',
     letterSpacing: 8, paddingVertical: 10, backgroundColor: '#000'
   },
 
@@ -775,7 +775,7 @@ const styles = StyleSheet.create({
   classNameLarge: { color: '#fff', fontSize: 28, fontWeight: '900', letterSpacing: -1 },
   classDesc: { color: '#e2e8f0', fontSize: 10, lineHeight: 14, marginBottom: 16, fontWeight: '600' },
   confirmClassBtn: { 
-    backgroundColor: 'rgba(0, 0, 0, 0.6)', borderWidth: 1, borderColor: '#22d3ee', 
+    backgroundColor: 'rgba(0, 0, 0, 0.3)', borderWidth: 1, borderColor: '#22d3ee', 
     paddingVertical: 10, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8 
   },
   confirmClassText: { color: '#fff', fontSize: 10, fontWeight: '900', letterSpacing: 2 },

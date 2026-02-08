@@ -294,7 +294,6 @@ const ClassSelectionScreen = () => {
         </View>
 
         <View style={styles.titleContainer}>
-            <Text style={styles.mainTitle}>CLASS SELECTION</Text>
             <Text style={styles.subTitle}>SELECT YOUR COMBAT ARCHETYPE</Text>
         </View>
 
@@ -411,7 +410,6 @@ const styles = StyleSheet.create({
   modeText: { color: 'rgba(255,255,255,0.4)', fontSize: 10, fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', marginTop: 2 },
 
   titleContainer: { alignItems: 'center', marginBottom: 10, zIndex: 10 },
-  mainTitle: { fontSize: 32, fontWeight: '900', color: '#fff', letterSpacing: 1, textShadowColor: '#3b82f6', textShadowRadius: 15 },
   subTitle: { fontSize: 10, color: '#bfdbfe', letterSpacing: 3, opacity: 0.6, marginTop: 4 },
 
   paneContainer: {
@@ -500,7 +498,7 @@ const styles = StyleSheet.create({
   },
   confirmButton: {
     width: '90%',
-    backgroundColor: 'rgba(0,0,0,0.8)',
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
     borderWidth: 1, borderColor: '#22d3ee',
     paddingVertical: 15,
     borderRadius: 2, 

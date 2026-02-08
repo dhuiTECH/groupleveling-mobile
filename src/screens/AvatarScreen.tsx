@@ -6,7 +6,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { MotiView } from 'moti';
 import * as Haptics from 'expo-haptics';
 import { Audio, Video, ResizeMode } from 'expo-av';
-import { ChevronRight, User as UserIcon, Eye, Smile, Sparkles, Shirt, Hexagon } from 'lucide-react-native';
+import { ChevronRight, User as UserIcon, Eye, Smile, Sparkles, Shirt, Hexagon, Dices } from 'lucide-react-native';
 import { supabase } from "@/lib/supabase";
 import LayeredAvatar from "@/components/LayeredAvatar";
 import { User } from "@/types/user";
@@ -233,14 +233,12 @@ export default function AvatarScreen({ navigation }: any) {
 
   // When the base body changes (e.g. switching genders), reset part selections
   // so we don't point at indices that are no longer valid for the new base.
-  useEffect(() => {
-    setSelectedPartIndex({});
-  }, [selectedBaseIndex]);
 
   const handleSelect = (index: number) => {
     triggerSelectionFeedback();
     if (activeCategory === "base") {
       setSelectedBaseIndex(index);
+      setSelectedPartIndex({}); // Reset parts when base manually changed
       const newBase = apiBases[index];
       if (newBase?.skin_tint_hex) {
         setSkinTint(newBase.skin_tint_hex);
@@ -253,6 +251,51 @@ export default function AvatarScreen({ navigation }: any) {
   const handleSkinSelect = (hex: string) => {
     setSkinTint(hex);
     Haptics.selectionAsync();
+  };
+
+  const handleRandomize = () => {
+    if (apiBases.length === 0) return;
+
+    // 1. Pick a random base
+    const randomBaseIdx = Math.floor(Math.random() * apiBases.length);
+    const randomBase = apiBases[randomBaseIdx];
+    
+    // 2. Determine available parts for this base's gender
+    let baseGender = 'male';
+    if (randomBase && randomBase.gender) {
+        const g = Array.isArray(randomBase.gender) ? randomBase.gender[0] : randomBase.gender;
+        baseGender = g.toLowerCase();
+    }
+
+    const newPartIndices: Record<string, number> = {};
+    for (const slot of PART_SLOTS) {
+        const items = apiParts.filter(p => {
+            if (p.slot !== slot) return false;
+            if (!p.gender) return true;
+            const itemGenders = Array.isArray(p.gender) 
+                ? p.gender.map((g: string) => g.toLowerCase())
+                : [p.gender.toLowerCase()];
+            if (itemGenders.includes('unisex') || itemGenders.includes('all')) return true;
+            return itemGenders.includes(baseGender);
+        });
+
+        // Add "None" for face slot
+        const availableCount = slot === 'face' ? items.length + 1 : items.length;
+        if (availableCount > 0) {
+            newPartIndices[slot] = Math.floor(Math.random() * availableCount);
+        }
+    }
+
+    // 3. Pick random skin tone
+    const randomSkin = SKIN_TONES[Math.floor(Math.random() * SKIN_TONES.length)].hex;
+
+    // 4. Update states
+    setSelectedBaseIndex(randomBaseIdx);
+    setSelectedPartIndex(newPartIndices);
+    setSkinTint(randomSkin);
+    
+    // Trigger feedback
+    triggerSelectionFeedback();
   };
 
   const syntheticUser = useMemo(() => {
@@ -351,6 +394,14 @@ export default function AvatarScreen({ navigation }: any) {
             <Text style={styles.modeText}>MODE: AVATAR_GEN</Text>
           </View>
           <View style={{ alignItems: 'flex-end' }}>
+            <TouchableOpacity 
+              onPress={handleRandomize}
+              style={styles.randomBtn}
+              activeOpacity={0.7}
+            >
+              <Dices size={14} color="#22d3ee" />
+              <Text style={styles.randomText}>RANDOMIZE</Text>
+            </TouchableOpacity>
             <Text style={styles.modeText}>LOCAL_NODE: 04</Text>
           </View>
         </View>
@@ -369,16 +420,32 @@ export default function AvatarScreen({ navigation }: any) {
             >
               <Animated.Image 
                   source={RUNIC_CIRCLE}
-                  className="absolute w-[130%] h-[130%] opacity-60"
+                  className="absolute w-[170%] h-[170%] opacity-40"
                   resizeMode="contain"
-                  style={{ transform: [{ rotate: spin }] }}
+                  style={{ 
+                    transform: [{ rotate: spin }],
+                    tintColor: '#22d3ee',
+                  }}
+                  blurRadius={Platform.OS === 'ios' ? 10 : 5}
+              />
+              <Animated.Image 
+                  source={RUNIC_CIRCLE}
+                  className="absolute w-[155%] h-[155%] opacity-70"
+                  resizeMode="contain"
+                  style={{ 
+                    transform: [{ rotate: spin }],
+                    shadowColor: '#22d3ee',
+                    shadowOffset: { width: 0, height: 0 },
+                    shadowOpacity: 0.8,
+                    shadowRadius: 25,
+                  }}
               />
               <LayeredAvatar 
                   user={syntheticUser} 
                   size={avatarSize} 
                   hideBackground 
                   square 
-                  style={{ backgroundColor: 'rgba(0,0,0,0.2)' }}
+                  style={{ backgroundColor: 'transparent' }}
               />
               
               {/* Flash Overlay */}
@@ -640,7 +707,7 @@ const styles = StyleSheet.create({
   },
   finalizeBtn: {
     width: '90%',
-    backgroundColor: 'rgba(0,0,0,0.8)',
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
     borderWidth: 1,
     borderColor: '#22d3ee',
     paddingVertical: 15,
@@ -655,5 +722,24 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '900',
     letterSpacing: 3,
+  },
+  randomBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(34, 211, 238, 0.1)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(34, 211, 238, 0.3)',
+    marginBottom: 4,
+  },
+  randomText: {
+    color: '#22d3ee',
+    fontSize: 9,
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+    fontWeight: 'bold',
+    letterSpacing: 1,
   },
 });
